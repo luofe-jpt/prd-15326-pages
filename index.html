@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>PRD_15326 自建仓发货头程装箱 - 流程图 v3</title>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<style>
+  body {
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    max-width: 1500px;
+    margin: 20px auto;
+    padding: 20px;
+    background: #f5f7fa;
+    color: #2c3e50;
+  }
+  h1 {
+    text-align: center;
+    color: #1a73e8;
+    border-bottom: 3px solid #1a73e8;
+    padding-bottom: 10px;
+  }
+  h2 {
+    color: #34495e;
+    border-left: 4px solid #1a73e8;
+    padding-left: 12px;
+    margin-top: 30px;
+  }
+  .meta {
+    text-align: center;
+    color: #7f8c8d;
+    font-size: 14px;
+    margin-bottom: 30px;
+  }
+  .global-rule {
+    background: linear-gradient(90deg, #fff8e1 0%, #fff3cd 100%);
+    border: 2px solid #f59e0b;
+    border-radius: 8px;
+    padding: 14px 20px;
+    margin: 20px 0;
+    font-size: 15px;
+  }
+  .global-rule strong { color: #b45309; font-size: 16px; }
+  .mermaid {
+    background: #fff;
+    border-radius: 8px;
+    padding: 20px;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    text-align: center;
+    overflow-x: auto;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    margin: 16px 0;
+  }
+  th {
+    background: #1a73e8;
+    color: #fff;
+    padding: 12px;
+    text-align: left;
+    font-weight: 600;
+  }
+  td {
+    padding: 10px 12px;
+    border-bottom: 1px solid #e8eaed;
+    vertical-align: top;
+    font-size: 14px;
+  }
+  tr:hover { background: #f8f9fa; }
+  .highlight-self { color: #d97706; font-weight: 600; }
+  .highlight-third { color: #5f6368; }
+  .legend {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+    margin: 16px 0;
+    font-size: 13px;
+  }
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .legend-color {
+    width: 20px;
+    height: 12px;
+    border-radius: 3px;
+    border: 1px solid #999;
+  }
+  .constraint {
+    background: #fff8e6;
+    border-left: 4px solid #f59e0b;
+    padding: 12px 16px;
+    border-radius: 4px;
+    margin: 12px 0;
+  }
+  .constraint h3 { margin: 0 0 8px 0; color: #b45309; font-size: 15px; }
+  .constraint ul { margin: 0; padding-left: 20px; }
+  code {
+    background: #f0f0f0;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body>
+
+<h1>PRD_15326 自建海外仓发货头程与装箱处理</h1>
+<div class="meta">禅道任务 ID：15326 ｜ 指派人：罗晓靓 ｜ 流程图 v3（三方仓 / 自建仓 双路径展示）</div>
+
+<div class="global-rule">
+  <strong>🔔 全局规则</strong>：自建仓所有功能点 <b>不直接更新 winit_stock_oa</b>，库存全部走 <code>wh_stock</code>（待发海外仓 / 自建仓），winit_stock_oa 仅由<b>定时任务同步</b>。
+</div>
+
+<h2>整体操作流程图</h2>
+
+<div class="legend">
+  <div class="legend-item"><span class="legend-color" style="background:#E0F4FF;"></span>判断节点</div>
+  <div class="legend-item"><span class="legend-color" style="background:#E8F0FE;"></span>三方仓节点</div>
+  <div class="legend-item"><span class="legend-color" style="background:#FFF59D;border-color:#F57F17;"></span>三方仓改造节点（标黄）</div>
+  <div class="legend-item"><span class="legend-color" style="background:#FFE4B5;"></span>自建仓节点</div>
+  <div class="legend-item"><span class="legend-color" style="background:#FFF4E6;"></span>定时任务</div>
+  <div class="legend-item"><span class="legend-color" style="background:#D4EDDA;"></span>开始/结束</div>
+</div>
+
+<div class="mermaid">
+flowchart TD
+    Start([操作开始]) --> Plan[发货计划-新建]
+    Plan --> Judge{仓库配置.服务商<br/>= 自建?}
+
+    %% 三方仓路径
+    Judge -->|否 → 三方仓| T1["配货包装 扫SKU<br/>━━━━━━━━━━<br/>仅创建分配单<br/>business_no = 分配单ID<br/>📦 待发海外仓.有货占用 + / 预占用 −"]
+    T1 --> T2["PDA装箱 扫业务单号 🟡<br/>━━━━━━━━━━<br/>统一扫码入口（原扫分配单ID）<br/>📦 库存不变"]
+    T2 --> T3[预建入库单<br/>同收货仓库+同头程物流明细才可建]
+    T3 --> T4[提交入库单<br/>调用三方仓 API 创建入库单]
+    T4 --> T5[发货 转运输中<br/>📦 winit_stock_oa.待发数量 −<br/>海外仓入库单在途 +]
+    T5 --> T6[摊分费用<br/>头程/关税/材料费摊分到商品成本]
+    T6 --> T7[同步入库单 行项已上架<br/>API 同步上架状态<br/>📦 winit_stock_oa.真实库存 +<br/>海外仓入库单在途 −]
+    T7 --> END1([完成])
+
+    %% 自建仓路径
+    Judge -->|是 → 自建仓| S1["配货包装 扫SKU<br/>━━━━━━━━━━<br/>① 创建调拨单<br/>② 调拨单转配货完成<br/>③ 创建分配单 business_no=调拨单号<br/>④ 打印调拨单标签<br/>📦 wh_stock 待发.有货占用 + / 预占用 −<br/>wh_stock 自建仓.在途 +"]
+    S1 --> S2["PDA装箱 扫业务单号<br/>━━━━━━━━━━<br/>后端自动路由<br/>跳过 winit_stock_oa 更新"]
+    S2 --> S3[预建入库单]
+    S3 --> S4["提交入库单<br/>━━━━━━━━━━<br/>无需调用 API<br/>仅回写 inbound_order_id"]
+    S4 --> S5["发货 转运输中<br/>━━━━━━━━━━<br/>前置校验：物流商单号不为空<br/>联动调拨单批量发货<br/>快递公司=头程-货代公司<br/>快递单号=入库单.物流商单号<br/>📦 库存不变"]
+    S5 --> S6["摊分费用<br/>━━━━━━━━━━<br/>调用关联调拨单摊分接口<br/>avg_cost = Σ 入库箱子单位成本 × 装箱数量<br/>　　　　　／ 入库单总装箱数量"]
+    S6 --> S7["调拨单上架<br/>━━━━━━━━━━<br/>前置校验：调拨单 avg_cost 非空<br/>📦 wh_stock 待发.有货占用 − / 真实库存 −<br/>wh_stock 自建仓.在途 − / 真实库存 +"]
+    S7 --> Timer[/⏱ 定时任务同步<br/>查询调拨单上架状态/]
+    Timer --> S8["入库单上架<br/>━━━━━━━━━━<br/>winit_stock_in_package.listing_status = 1<br/>所有行项完成 → 入库单转已上架<br/>数量差异 → 业务手动建出库单"]
+    S8 --> END2([完成])
+
+    %% 三方仓样式
+    style T1 fill:#E8F0FE,stroke:#5f6368
+    style T2 fill:#FFF59D,stroke:#F57F17,stroke-width:2px
+    style T3 fill:#E8F0FE,stroke:#5f6368
+    style T4 fill:#E8F0FE,stroke:#5f6368
+    style T5 fill:#E8F0FE,stroke:#5f6368
+    style T6 fill:#E8F0FE,stroke:#5f6368
+    style T7 fill:#E8F0FE,stroke:#5f6368
+
+    %% 自建仓样式
+    style S1 fill:#FFE4B5,stroke:#FF8C00,stroke-width:2px
+    style S2 fill:#FFE4B5,stroke:#FF8C00,stroke-width:2px
+    style S3 fill:#FFE4B5,stroke:#FF8C00,stroke-width:2px
+    style S4 fill:#FFE4B5,stroke:#FF8C00,stroke-width:2px
+    style S5 fill:#FFE4B5,stroke:#FF8C00,stroke-width:2px
+    style S6 fill:#FFE4B5,stroke:#FF8C00,stroke-width:2px
+    style S7 fill:#FFE4B5,stroke:#FF8C00,stroke-width:2px
+    style S8 fill:#FFE4B5,stroke:#FF8C00,stroke-width:2px
+
+    style Judge fill:#E0F4FF,stroke:#0077CC,stroke-width:2px
+    style Timer fill:#FFF4E6,stroke:#CC6600,stroke-width:2px
+    style Start fill:#D4EDDA,stroke:#2E7D32
+    style END1 fill:#D4EDDA,stroke:#2E7D32
+    style END2 fill:#D4EDDA,stroke:#2E7D32
+    style Plan fill:#fff,stroke:#666
+</div>
+
+<div class="constraint">
+  <h3>⚠️ 自建仓特有约束</h3>
+  <ul>
+    <li><b>全局</b>：所有功能点不更新 <code>winit_stock_oa</code>，仅定时任务同步</li>
+    <li><b>调拨单</b>：不支持作废与回退；不支持修改上架数量</li>
+    <li><b>分配单</b>：business_no=调拨单号 时，不允许取消、不允许修改数量</li>
+    <li><b>入库单</b>：转运输中前，物流商单号必须不为空</li>
+    <li><b>调拨单上架</b>：前置校验关联调拨单 <code>avg_cost</code> 非空</li>
+    <li><b>入库单上架</b>：定时任务同步调拨单上架状态，<code>winit_stock_in_package.listing_status = 1</code> 时入库单转已上架</li>
+    <li><b>差异处理</b>：上架数量差异由业务手动创建出库单（不再自动建单/通知）</li>
+  </ul>
+</div>
+
+<h2>各节点动作 & 库存变更对比</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th style="width:14%">节点</th>
+      <th style="width:42%" class="highlight-third">三方仓</th>
+      <th style="width:44%" class="highlight-self">自建仓</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><b>判断逻辑</b></td>
+      <td>收货仓库 ≠ 自建</td>
+      <td class="highlight-self">收货仓库所属仓库配置.服务商 = 自建</td>
+    </tr>
+    <tr>
+      <td><b>发货计划-新建</b></td>
+      <td>winit_stock_oa.待发数量 +<br/>待发海外仓.预占用 +</td>
+      <td class="highlight-self">wh_stock(待发).预占用 +<br/>不更新 winit_stock_oa</td>
+    </tr>
+    <tr>
+      <td><b>配货包装（扫SKU）</b></td>
+      <td>待发海外仓.有货占用 + / 预占用 −<br/>winit_stock_oa.待发数量 不变</td>
+      <td class="highlight-self">同一事务：创建调拨单 + 转配货完成 + 创建分配单（business_no=调拨单号）+ 打印调拨单标签<br/>wh_stock(待发).有货占用 + / 预占用 −<br/>wh_stock(自建仓).在途 +</td>
+    </tr>
+    <tr>
+      <td><b>PDA装箱</b></td>
+      <td>扫分配单ID</td>
+      <td class="highlight-self">扫业务单号 business_no（统一入口，后端自动路由）</td>
+    </tr>
+    <tr>
+      <td><b>预建入库单</b></td>
+      <td>同收货仓库+同头程物流明细才可建</td>
+      <td>同左</td>
+    </tr>
+    <tr>
+      <td><b>提交入库单</b></td>
+      <td>调用三方仓 API 创建入库单</td>
+      <td class="highlight-self">无需调用 API，仅回写 inbound_order_id 至关联调拨单</td>
+    </tr>
+    <tr>
+      <td><b>发货（转运输中）</b></td>
+      <td>winit_stock_oa.待发数量 − / 海外仓入库单在途 +<br/>待发海外仓.真实库存 − / 有货占用 −</td>
+      <td class="highlight-self">校验物流商单号；联动调拨单批量发货<br/>快递公司=头程-货代公司，快递单号=物流商单号<br/>📦 库存不变</td>
+    </tr>
+    <tr>
+      <td><b>摊分费用</b></td>
+      <td>头程/关税/材料费摊分到商品成本</td>
+      <td class="highlight-self">调用调拨单摊分接口<br/>avg_cost = Σ(入库箱子单位成本 × 装箱数量) / 入库单总装箱数量</td>
+    </tr>
+    <tr>
+      <td><b>调拨单上架</b></td>
+      <td>—</td>
+      <td class="highlight-self">前置校验：关联调拨单 avg_cost 非空<br/>wh_stock(待发).有货占用 − / 真实库存 −<br/>wh_stock(自建仓).在途 − / 真实库存 +</td>
+    </tr>
+    <tr>
+      <td><b>入库单上架</b></td>
+      <td>同步入库单（API同步上架状态）<br/>winit_stock_oa.真实库存 + (用OA发货数量)<br/>海外仓入库单在途 −</td>
+      <td class="highlight-self">⏱ 定时任务同步调拨单上架状态<br/>winit_stock_in_package.listing_status = 1<br/>所有行项完成 → 入库单转已上架</td>
+    </tr>
+    <tr>
+      <td><b>差异处理</b></td>
+      <td>差异量自动建出库单/入库单 + 钉钉通知</td>
+      <td class="highlight-self">业务手动创建出库单<br/>调拨单不支持修改上架数量</td>
+    </tr>
+  </tbody>
+</table>
+
+<script>
+  mermaid.initialize({
+    startOnLoad: true,
+    theme: 'default',
+    flowchart: {
+      curve: 'basis',
+      padding: 15,
+      nodeSpacing: 60,
+      rankSpacing: 50
+    }
+  });
+</script>
+
+</body>
+</html>
