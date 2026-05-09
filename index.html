@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
@@ -149,7 +149,7 @@ flowchart TD
     S2 --> S3[预建入库单]
     S3 --> S4["提交入库单<br/>━━━━━━━━━━<br/>无需调用 API<br/>仅回写 inbound_order_id"]
     S4 --> S5["发货 转运输中<br/>━━━━━━━━━━<br/>前置校验：物流商单号不为空<br/>联动调拨单批量发货<br/>快递公司=头程-货代公司<br/>快递单号=入库单.物流商单号<br/>📦 库存不变"]
-    S5 --> S6["摊分费用<br/>━━━━━━━━━━<br/>调用关联调拨单摊分接口<br/>avg_cost = Σ 入库箱子单位成本 × 装箱数量<br/>　　　　　／ 入库单总装箱数量"]
+    S5 --> S6["摊分费用<br/>━━━━━━━━━━<br/>加权平均<br/>更新头程/关税/材料费/国内物流费至调拨单<br/>调拨单计算摊分"]
     S6 --> S7["调拨单上架<br/>━━━━━━━━━━<br/>前置校验：调拨单 avg_cost 非空<br/>📦 wh_stock 待发.有货占用 − / 真实库存 −<br/>wh_stock 自建仓.在途 − / 真实库存 +"]
     S7 --> Timer[/⏱ 定时任务同步<br/>查询调拨单上架状态/]
     Timer --> S8["入库单上架<br/>━━━━━━━━━━<br/>winit_stock_in_package.listing_status = 1<br/>所有行项完成 → 入库单转已上架<br/>数量差异 → 业务手动建出库单"]
@@ -244,7 +244,7 @@ flowchart TD
     <tr>
       <td><b>摊分费用</b></td>
       <td>头程/关税/材料费摊分到商品成本</td>
-      <td class="highlight-self">调用调拨单摊分接口<br/>avg_cost = Σ(入库箱子单位成本 × 装箱数量) / 入库单总装箱数量</td>
+      <td class="highlight-self">加权平均，更新头程/关税/材料费/国内物流费至调拨单，调拨单计算摊分</td>
     </tr>
     <tr>
       <td><b>调拨单上架</b></td>
