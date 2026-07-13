@@ -1,0 +1,953 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>三方仓入库单 - 特殊费用补摊原型</title>
+  <style>
+    :root {
+      --primary: #009688;
+      --primary-hover: #00877a;
+      --blue: #1e9fff;
+      --warning: #ffb800;
+      --danger: #ff5722;
+      --success: #16a36a;
+      --text: #222;
+      --muted: #767676;
+      --border: #e2e4e8;
+      --line: #eceef1;
+      --surface: #fff;
+      --page: #f2f3f5;
+      --sidebar: #20232c;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { min-width: 360px; min-height: 100%; }
+    body { margin: 0; color: var(--text); background: var(--page); font: 13px/1.5 "Microsoft YaHei", "PingFang SC", Arial, sans-serif; letter-spacing: 0; }
+    button, input, select { font: inherit; }
+    button { cursor: pointer; }
+    input, select { width: 100%; height: 32px; padding: 5px 10px; border: 1px solid #d7d9de; border-radius: 2px; color: var(--text); background: #fff; outline: none; }
+    input::placeholder { color: #c1c3c8; }
+    input:focus, select:focus { border-color: var(--primary); box-shadow: 0 0 0 2px rgba(0, 150, 136, .1); }
+
+    .app-shell { min-height: 100vh; }
+    .side-nav { position: fixed; z-index: 30; inset: 0 auto 0 0; width: 58px; overflow: hidden auto; color: #fff; background: var(--sidebar); }
+    .brand { height: 41px; display: grid; place-items: center; color: #ffd43b; border-bottom: 1px solid #30343e; font-size: 20px; font-weight: 800; }
+    .side-search { height: 52px; display: grid; place-items: center; color: #d7dbe5; font-size: 24px; }
+    .side-search span { width: 16px; height: 16px; display: block; border: 1.5px solid currentColor; border-radius: 50%; position: relative; }
+    .side-search span::after { content: ""; position: absolute; width: 6px; height: 1.5px; right: -5px; bottom: -2px; transform: rotate(45deg); background: currentColor; }
+    .side-item { height: 45px; display: grid; place-items: center; padding: 0 4px; color: #fff; text-align: center; font-weight: 600; white-space: nowrap; }
+    .side-item.active { color: #fff; background: #151820; border-left: 3px solid var(--primary); }
+
+    .main-shell { min-width: 0; margin-left: 58px; }
+    .workspace-topbar { height: 41px; display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 0 22px 0 12px; border-bottom: 1px solid #d9dbe0; background: #fff; }
+    .top-tabs { min-width: 0; display: flex; align-items: center; gap: 4px; overflow: hidden; }
+    .top-back { width: 28px; color: #333; text-align: center; font-size: 18px; }
+    .top-tab { height: 29px; display: inline-flex; align-items: center; gap: 7px; padding: 0 10px; border: 1px solid #d8dae0; border-radius: 2px; background: #fff; color: #333; white-space: nowrap; }
+    .top-tab.active { color: #fff; border-color: #4e9ef8; background: #4e9ef8; }
+    .top-tab .close-mark { color: currentColor; opacity: .7; }
+    .top-actions { display: flex; align-items: center; gap: 12px; white-space: nowrap; }
+    .top-actions .rank { min-height: 28px; display: inline-flex; align-items: center; padding: 0 10px; color: #fff; background: #4e9ef8; }
+    .current-user { color: #555; }
+
+    .workspace { min-width: 0; padding: 14px; }
+    .panel { margin-bottom: 12px; border: 1px solid #e6e7ea; border-radius: 2px; background: var(--surface); }
+    .search-card { min-height: 134px; padding: 10px 14px 12px; }
+    .search-grid { display: grid; grid-template-columns: repeat(6, minmax(210px, 1fr)); gap: 4px 12px; }
+    .search-field { min-width: 0; display: grid; grid-template-columns: 104px minmax(0, 1fr); align-items: center; gap: 8px; }
+    .search-field label { color: #555; text-align: right; white-space: nowrap; }
+    .search-field.compact { grid-template-columns: 104px minmax(0, 1fr); }
+    .search-inline-actions { display: flex; align-items: center; gap: 8px; padding-left: 6px; }
+    .search-inline-actions .btn { flex: 0 0 auto; }
+
+    .btn { min-height: 32px; padding: 5px 12px; border: 1px solid #d6d8dd; border-radius: 2px; color: #333; background: #fff; font-size: 12px; line-height: 20px; }
+    .btn:hover { border-color: #b7bbc3; background: #f7f8fa; }
+    .btn.primary, .btn.teal { color: #fff; border-color: var(--primary); background: var(--primary); }
+    .btn.primary:hover, .btn.teal:hover { background: var(--primary-hover); }
+    .btn.blue { color: #fff; border-color: var(--blue); background: var(--blue); }
+    .btn.warm { color: #fff; border-color: var(--warning); background: var(--warning); }
+    .btn.danger { color: #fff; border-color: var(--danger); background: var(--danger); }
+    .btn.link { min-height: auto; padding: 0; border: 0; color: #1683e5; background: transparent; line-height: 1.5; }
+    .btn.small { min-height: 24px; padding: 2px 8px; line-height: 18px; }
+    .btn.tiny { min-height: 22px; padding: 1px 7px; line-height: 18px; }
+    .btn.icon { width: 24px; min-height: 24px; padding: 0; font-size: 17px; line-height: 1; }
+    .btn:disabled { cursor: not-allowed; color: #b4b7bd; border-color: #e1e3e7; background: #f5f6f8; }
+
+    .list-card { overflow: hidden; }
+    .list-toolbar { min-height: 43px; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 0 12px; border-bottom: 1px solid var(--line); }
+    .list-toolbar-left, .list-toolbar-right { display: flex; align-items: center; gap: 7px; }
+    .list-toolbar-left { min-width: 0; }
+    .list-toolbar-right { justify-content: flex-end; flex-wrap: wrap; }
+    .status-tabs { height: 42px; display: flex; align-items: stretch; }
+    .status-tab { min-width: 92px; display: flex; align-items: center; justify-content: center; padding: 0 12px; border: 0; border-bottom: 2px solid transparent; color: #333; background: transparent; white-space: nowrap; }
+    .status-tab.active { color: #111; border-bottom-color: var(--primary); background: #fafafa; font-weight: 700; }
+    .status-tab span { margin-left: 2px; color: #555; font-weight: 400; }
+    .inline-input { width: 120px; }
+    .inline-input.narrow { width: 78px; }
+    .new-badge { display: inline-flex; align-items: center; justify-content: center; min-height: 18px; margin-left: 4px; padding: 0 5px; border-radius: 2px; color: #b85f00; background: #fff1d6; font-size: 11px; font-weight: 400; }
+    .confirm-status { display: flex; align-items: center; gap: 7px; }
+    .status-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--warning); }
+
+    .table-wrap { overflow: auto; }
+    .order-table-wrap { max-height: calc(100vh - 264px); min-height: 425px; }
+    table { width: 100%; min-width: 1120px; border-collapse: separate; border-spacing: 0; }
+    th, td { padding: 8px 9px; border-right: 1px solid #e4e6e9; border-bottom: 1px solid #e4e6e9; text-align: left; vertical-align: middle; white-space: nowrap; }
+    th:first-child, td:first-child { border-left: 1px solid #e4e6e9; }
+    th { color: #111; background: #f5f6f7; font-weight: 700; }
+    .order-table { min-width: 1810px; table-layout: fixed; }
+    .order-table th, .order-table td { overflow: hidden; text-align: center; }
+    .order-table thead th { height: 66px; }
+    .order-table tbody tr { height: 108px; }
+    .order-table tbody tr:hover { background: #f7fbfb; }
+    .order-table .check-col { width: 34px; }
+    .order-table .order-col { width: 132px; }
+    .order-table .express-col { width: 140px; }
+    .order-table .warehouse-col { width: 118px; }
+    .order-table .channel-col { width: 170px; }
+    .order-table .number-col { width: 90px; }
+    .order-table .fee-col { width: 102px; }
+    .order-table .special-col { width: 118px; background: #fffaf0; }
+    .order-table .time-col { width: 176px; }
+    .order-table .operation-col { width: 94px; }
+    .order-table input[type="checkbox"], .check-list input[type="checkbox"], #selectAllSkus, .sku-check { width: 16px; height: 16px; accent-color: var(--primary); }
+    .order-link { color: #1683e5; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; white-space: normal; }
+    .order-table td:nth-child(2), .order-table td:nth-child(3), .order-table td:nth-child(4) { line-height: 1.75; white-space: normal; overflow-wrap: anywhere; word-break: break-all; }
+    .order-table td:nth-child(3) strong { display: block; white-space: normal; overflow-wrap: anywhere; word-break: break-all; }
+    .channel-lines, .time-lines { color: #222; text-align: left; line-height: 1.85; white-space: normal; }
+    .channel-lines .muted-line { color: #777; }
+    .head-total { display: block; margin-top: 4px; color: #111; font-size: 13px; }
+    .status { display: inline-flex; align-items: center; min-height: 22px; padding: 1px 7px; border-radius: 2px; font-size: 12px; }
+    .status.green { color: #087e52; background: #e7f7f0; }
+    .status.gray { color: #777; background: #f0f1f2; }
+    .status.orange { color: #a96300; background: #fff2dc; }
+    .money-link { color: #1683e5; text-decoration: underline; text-underline-offset: 2px; cursor: pointer; }
+    .special-cell { line-height: 1.8; }
+    .special-cell .detail-action { display: block; margin: 3px auto 0; }
+    .operation-stack { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+    .op-btn { min-width: 58px; min-height: 22px; padding: 1px 7px; border: 0; border-radius: 2px; color: #fff; background: var(--primary); font-size: 12px; }
+    .op-btn.warm { background: var(--warning); }
+    .op-btn.danger { background: var(--danger); }
+    .pagination { min-height: 42px; display: flex; align-items: center; justify-content: center; gap: 8px; padding: 6px 12px; color: #555; background: #fff; }
+    .page-box { min-width: 32px; height: 26px; display: grid; place-items: center; border-radius: 2px; color: #fff; background: var(--primary); }
+    .page-input { width: 38px; height: 26px; text-align: center; }
+    .page-size { width: 78px; height: 26px; padding: 1px 5px; background: #d9f3df; }
+
+    .field { display: grid; grid-template-columns: 90px minmax(0, 1fr); align-items: center; gap: 8px; }
+    .field label { color: #4d5158; text-align: right; white-space: nowrap; }
+    .modal { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(18, 25, 38, .48); }
+    .modal.show { display: flex; }
+    .dialog { width: min(1100px, 96vw); max-height: 92vh; display: flex; flex-direction: column; border-radius: 2px; background: #fff; box-shadow: 0 14px 44px rgba(17, 24, 39, .24); }
+    .dialog.medium { width: min(820px, 96vw); }
+    .dialog.small { width: min(540px, 96vw); }
+    .dialog-header { min-height: 46px; display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+    .dialog-header h2 { margin: 0; font-size: 16px; }
+    .dialog-body { overflow: auto; padding: 14px 16px; }
+    .dialog-footer { min-height: 48px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 16px; border-top: 1px solid var(--line); }
+    .dialog-footer .btn { min-height: 24px; padding: 2px 12px; }
+    .summary-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-bottom: 14px; border: 1px solid var(--border); background: var(--border); }
+    .summary-cell { min-height: 58px; padding: 8px 10px; background: #fff; }
+    .summary-cell span { display: block; color: var(--muted); font-size: 12px; }
+    .summary-cell strong { display: block; margin-top: 3px; font-size: 14px; }
+    .section-title { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 16px 0 8px; }
+    .section-title h3 { margin: 0; font-size: 14px; }
+    .hint { color: var(--muted); font-size: 12px; }
+    .fee-table table { min-width: 900px; }
+    .compact-table { min-width: 0; }
+    #groupModal table, #stageErrorModal table, #errorModal table, #recordDetailModal table { min-width: 0; }
+    .fee-table input, .fee-table select { height: 30px; }
+    .fee-table td { vertical-align: top; }
+    .error-text { margin-top: 3px; color: var(--danger); font-size: 12px; }
+    .sku-summary { min-width: 120px; color: var(--muted); white-space: normal; }
+    .inline-total { display: flex; align-items: center; justify-content: flex-end; gap: 16px; margin-top: 10px; font-weight: 700; }
+    .notice { margin-bottom: 12px; padding: 9px 11px; border-left: 3px solid var(--primary); background: #edf9f7; color: #315c56; }
+    .notice.warning { border-left-color: var(--warning); background: #fff7e1; color: #7a5610; }
+    .notice.danger { border-left-color: var(--danger); background: #fff0eb; color: #923b22; }
+    .check-list { border: 1px solid var(--border); }
+    .check-row { display: grid; grid-template-columns: 24px minmax(0, 1fr) 74px; gap: 10px; align-items: start; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+    .check-row:last-child { border-bottom: 0; }
+    .check-row input { margin-top: 2px; }
+    .check-row small { display: block; margin-top: 2px; color: var(--muted); }
+    .check-state { color: #b86b00; text-align: right; }
+    .check-row.checked .check-state { color: var(--success); }
+    .confirm-fields { display: grid; grid-template-columns: 1fr 220px; gap: 12px; margin-top: 12px; }
+    .stack-field label { display: block; margin-bottom: 5px; color: var(--muted); }
+    .toast { position: fixed; z-index: 100; left: 50%; top: 54px; display: none; transform: translateX(-50%); padding: 9px 14px; border-radius: 2px; color: #fff; background: #2b313b; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+    .toast.show { display: block; }
+    .empty { padding: 36px 12px; text-align: center; color: var(--muted); }
+
+    @media (max-width: 1450px) {
+      .search-grid { grid-template-columns: repeat(4, minmax(210px, 1fr)); }
+      .list-toolbar { align-items: flex-start; flex-direction: column; padding: 0 10px 8px; }
+      .list-toolbar-right { justify-content: flex-start; }
+      .order-table-wrap { max-height: calc(100vh - 330px); }
+    }
+    @media (max-width: 900px) {
+      .side-nav { width: 48px; }
+      .main-shell { margin-left: 48px; }
+      .side-item { font-size: 11px; }
+      .top-tabs .top-tab:not(.active) { display: none; }
+      .workspace { padding: 8px; }
+      .search-grid { grid-template-columns: repeat(2, minmax(190px, 1fr)); }
+      .status-tabs { overflow-x: auto; max-width: calc(100vw - 70px); }
+      .list-toolbar-right { width: 100%; }
+      .order-table-wrap { max-height: 520px; }
+      .summary-strip { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    }
+    @media (max-width: 560px) {
+      .workspace-topbar { padding-right: 8px; }
+      .top-actions .rank, .current-user { display: none; }
+      .search-grid, .summary-strip, .confirm-fields { grid-template-columns: 1fr; }
+      .search-field { grid-template-columns: 92px minmax(0, 1fr); }
+      .list-toolbar-left { width: 100%; overflow-x: auto; }
+      .list-toolbar-right { flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; }
+      .modal { padding: 5px; }
+      .dialog { width: 100%; max-height: 98vh; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="side-nav" aria-label="主导航">
+      <div class="brand">EP</div>
+      <div class="side-search" title="搜索"><span></span></div>
+      <div class="side-item">商品</div>
+      <div class="side-item">FBA</div>
+      <div class="side-item">速卖通</div>
+      <div class="side-item">eBay</div>
+      <div class="side-item">Shopee</div>
+      <div class="side-item">Lazada</div>
+      <div class="side-item">Amazon</div>
+      <div class="side-item">平台</div>
+      <div class="side-item">采购</div>
+      <div class="side-item">订单</div>
+      <div class="side-item">财务</div>
+      <div class="side-item">自建仓</div>
+      <div class="side-item active">三方仓</div>
+      <div class="side-item">平台仓</div>
+      <div class="side-item">配置</div>
+    </aside>
+
+    <div class="main-shell">
+      <header class="workspace-topbar">
+        <div class="top-tabs">
+          <span class="top-back">‹</span>
+          <span class="top-tab">首页</span>
+          <span class="top-tab">收货地址 <span class="close-mark">×</span></span>
+          <span class="top-tab">货件计划 <span class="close-mark">×</span></span>
+          <span class="top-tab active">● 三方仓入库单 <span class="close-mark">×</span></span>
+          <span class="top-tab">Shopee平台在线商品 <span class="close-mark">×</span></span>
+        </div>
+        <div class="top-actions">
+          <div class="confirm-status"><span class="status-dot" id="confirmDot"></span><button class="btn small" id="openConfirm">业务确认（<span id="confirmCount">0/8</span>）</button></div>
+          <span class="current-user">罗晓靓</span>
+          <span class="rank">排名数据⌃</span>
+        </div>
+      </header>
+
+      <main class="workspace">
+        <section class="panel search-card search_card_new">
+          <div class="search-grid">
+            <div class="search-field"><label>配货单状态</label><select><option>请选择</option><option>待配货</option><option>已配货</option></select></div>
+            <div class="search-field"><label>注册sku</label><input placeholder="多个用逗号隔开"></div>
+            <div class="search-field"><label>货代公司</label><select><option>请选择</option><option>喜运达</option><option>大境越</option></select></div>
+            <div class="search-field"><label>销售头程</label><select><option>请选择</option><option>泰国-喜运达</option><option>越南-大境越</option></select></div>
+            <div class="search-field"><label>真实头程</label><select><option>请选择</option><option>泰国-喜运达</option><option>越南-大境越</option></select></div>
+            <div class="search-field"><label for="warehouseSearch">收货仓库</label><select id="warehouseSearch"><option value="">请选择</option><option>自建仓泰国</option><option>元仓越南胡志明</option><option>万邑通美西仓</option></select></div>
+
+            <div class="search-field"><label>发货计划单号</label><input placeholder="多个用逗号隔开"></div>
+            <div class="search-field"><label>商品条码</label><input placeholder="多个用逗号隔开"></div>
+            <div class="search-field"><label>发货计划创建时间</label><input value="2026-01-13 00:00:00 - 2026-07-13 23:59:59"></div>
+            <div class="search-field"><label>分配明细单号</label><input placeholder="多个用逗号隔开"></div>
+            <div class="search-field"><label for="orderSearch">三方仓入库单号</label><input id="orderSearch" placeholder="多个用逗号隔开"></div>
+            <div class="search-field"><label for="expressSearch">物流商单号</label><input id="expressSearch" placeholder="多个用逗号隔开"></div>
+
+            <div class="search-field"><label>预建入库单</label><input placeholder="多个用逗号隔开"></div>
+            <div class="search-field"><label for="feeStatusSearch">摊分状态</label><select id="feeStatusSearch"><option value="">请选择</option><option>未摊分</option><option>已摊分</option></select></div>
+            <div class="search-field"><label for="statusSearch">入库状态</label><select id="statusSearch"><option value="">请选择</option><option>运输中</option><option>已上架</option></select></div>
+            <div class="search-inline-actions"><button class="btn teal" id="runSearch" type="button">搜索</button><button class="btn" id="resetSearch" type="button">清空</button></div>
+          </div>
+        </section>
+
+        <section class="panel list-card card_position">
+          <div class="list-toolbar tools_btn">
+            <div class="list-toolbar-left">
+              <div class="status-tabs" role="tablist" aria-label="入库单状态">
+                <button class="status-tab" type="button">待装箱<span>(2029)</span></button>
+                <button class="status-tab" type="button">预建入库单<span>(11)</span></button>
+                <button class="status-tab active" type="button">已提交入库单<span>(14)</span></button>
+                <button class="status-tab" type="button">运输中<span>(162)</span></button>
+                <button class="status-tab" type="button">部分上架<span>(28)</span></button>
+                <button class="status-tab" type="button">已上架<span>(475)</span></button>
+                <button class="status-tab" type="button">全部分配单<span>(167965)</span></button>
+              </div>
+              <button class="btn warm sim-action" type="button">导出</button>
+            </div>
+            <div class="list-toolbar-right">
+              <button class="btn warm" id="openReApportion" type="button">重新摊分</button>
+              <input class="inline-input" placeholder="业务单号" aria-label="业务单号">
+              <button class="btn teal sim-action" type="button">补打配货标签</button>
+              <input class="inline-input narrow" type="number" placeholder="打印数" aria-label="打印数">
+              <button class="btn teal sim-action" type="button">补打商品标签</button>
+              <button class="btn teal sim-action" type="button">同步入库单</button>
+              <button class="btn blue sim-action" type="button">批量修改物流</button>
+              <button class="btn blue" id="openSpecialFee" type="button">特殊费用摊分/补摊 <span class="new-badge">新增</span></button>
+            </div>
+          </div>
+
+          <div class="table-wrap order-table-wrap">
+            <table class="order-table" id="orderTable">
+              <thead>
+                <tr>
+                  <th class="check-col"><input type="checkbox" id="selectAllOrders" aria-label="全选入库单"></th>
+                  <th class="order-col">预建入库单</th>
+                  <th class="order-col">三方仓入库单</th>
+                  <th class="express-col">物流商单号</th>
+                  <th class="warehouse-col">收货仓库</th>
+                  <th class="channel-col">头程渠道</th>
+                  <th class="number-col">箱数 ⓘ<span class="head-total">42</span></th>
+                  <th class="number-col">总重量(kg) ⓘ<span class="head-total">4,262.48</span></th>
+                  <th class="number-col">商品种类 ⓘ<span class="head-total">2,584</span></th>
+                  <th class="number-col">商品总数 ⓘ<span class="head-total">7,012</span></th>
+                  <th class="fee-col">摊分状态</th>
+                  <th class="special-col">特殊费用(￥)<span class="new-badge">新增</span></th>
+                  <th class="number-col">方数(m³) ⓘ<span class="head-total">9.88</span></th>
+                  <th class="number-col">创建人</th>
+                  <th class="time-col">时间</th>
+                  <th class="operation-col">操作</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="pagination">
+            <span>‹</span>
+            <span class="page-box">1</span>
+            <span>›</span>
+            <span>到第</span><input class="page-input" value="1" aria-label="页码"><span>页</span>
+            <button class="btn small sim-action" type="button">确定</button>
+            <span>共 <strong id="rowCount">6</strong> 条</span>
+            <select class="page-size" aria-label="每页条数"><option>50条/页</option><option>20条/页</option></select>
+          </div>
+        </section>
+      </main>
+    </div>
+  </div>
+
+  <div class="modal" id="groupModal">
+    <div class="dialog medium">
+      <div class="dialog-header"><h2>选择物流商单</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body">
+        <div class="notice">特殊费用按物流商单号统一处理，系统将加载其下全部有效入库单。</div>
+        <div class="field" style="max-width:620px"><label for="groupSelect">物流商单号</label><select id="groupSelect"><option value="GLLCJ26071302677THE">GLLCJ26071302677THE（2张，全部未摊分）</option><option value="GLLCJ26071302638THE">GLLCJ26071302638THE（2张，全部已摊分，上架状态不一致）</option><option value="GLLCJ26071302655THE">GLLCJ26071302655THE（2张，摊分状态不一致）</option></select></div>
+        <div class="section-title"><h3>关联入库单</h3><span class="hint" id="groupStateHint"></span></div>
+        <div class="table-wrap"><table><thead><tr><th>入库单号</th><th>收货仓库</th><th>入库状态</th><th>摊分状态</th><th>商品SKU数</th></tr></thead><tbody id="groupPreviewRows"></tbody></table></div>
+      </div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">取消</button><button class="btn primary" id="continueSpecialFee" type="button">下一步</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="feeModal">
+    <div class="dialog">
+      <div class="dialog-header"><h2 id="feeDialogTitle">摊分费用</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body">
+        <div class="summary-strip" id="feeGroupSummary"></div>
+        <div class="section-title"><h3>关联入库单</h3><span class="hint">本次按物流商单统一计算，结果分别写入以下入库单</span></div>
+        <div class="table-wrap"><table class="compact-table"><thead><tr><th>入库单号</th><th>入库状态</th><th>摊分状态</th><th>商品SKU数</th></tr></thead><tbody id="feeGroupOrderRows"></tbody></table></div>
+        <div id="baseFeeSection">
+          <div class="section-title"><h3>现有费用</h3><span class="hint">原有四类费用保持现有摊分规则</span></div>
+          <div class="summary-strip">
+            <div class="summary-cell"><span>箱子+人力成本(￥)</span><strong>420.00</strong></div>
+            <div class="summary-cell"><span>国内物流(￥)</span><strong>680.00</strong></div>
+            <div class="summary-cell"><span>海外仓头程(￥)</span><strong>3,860.00</strong></div>
+            <div class="summary-cell"><span>VAT+关税(￥)</span><strong>920.00</strong></div>
+          </div>
+        </div>
+        <div class="notice" id="feeNotice"></div>
+        <div class="section-title"><h3>特殊费用</h3><button class="btn small primary" id="addFeeRow" type="button">+ 新增费用</button></div>
+        <div class="table-wrap fee-table">
+          <table><thead><tr><th style="width:48px">序号</th><th>费用名称</th><th>费用金额(￥)</th><th>摊分方式</th><th>承担商品SKU</th><th style="width:62px">操作</th></tr></thead><tbody id="feeRows"></tbody></table>
+        </div>
+        <div class="inline-total"><span>本次特殊费用合计</span><strong id="feeTotal">￥0.00</strong></div>
+      </div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">取消</button><button class="btn primary" id="submitFees" type="button">确认并生效</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="skuModal">
+    <div class="dialog medium">
+      <div class="dialog-header"><h2>选择承担费用的商品SKU</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body">
+        <div class="notice">合并展示物流商单下全部入库单商品。同一商品SKU跨入库单出现时选择一次，按全部关联明细参与计算。</div>
+        <div class="table-wrap"><table><thead><tr><th style="width:48px"><input type="checkbox" id="selectAllSkus"></th><th>入库单号</th><th>商品SKU</th><th>商品名称</th><th>注册SKU</th><th>发货数量</th><th>总体积(cm³)</th><th>当前库存</th></tr></thead><tbody id="skuRows"></tbody></table></div>
+      </div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">取消</button><button class="btn primary" id="confirmSkuSelection" type="button">确定选择</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="detailModal">
+    <div class="dialog">
+      <div class="dialog-header"><h2>分摊详情</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body">
+        <div class="summary-strip" id="detailSummary"></div>
+        <div class="notice"><strong>特殊费用摊分总计：</strong><button class="btn link" id="openRecords" type="button">￥1,080.00</button>，点击金额查看首次摊分、补摊及冲减记录。</div>
+        <div class="table-wrap"><table><thead><tr><th>注册SKU</th><th>商品SKU</th><th>商品名称</th><th>发货数量</th><th>箱子+人力</th><th>海外仓头程</th><th>国内物流</th><th>VAT+关税</th><th>特殊费用</th><th>入库成本</th></tr></thead><tbody id="detailRows"></tbody></table></div>
+      </div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">关闭</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="recordsModal">
+    <div class="dialog">
+      <div class="dialog-header"><h2>特殊费用摊分记录</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body">
+        <div class="notice" id="recordNotice">记录主维度为物流商单号，明细保留入库单号和商品SKU。</div>
+        <div class="table-wrap"><table><thead><tr><th>记录类型</th><th>费用名称</th><th>费用金额(￥)</th><th>摊分方式</th><th>商品SKU数量</th><th>操作人</th><th>操作时间</th><th>摊分明细</th></tr></thead><tbody id="recordRows"></tbody></table></div>
+      </div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">关闭</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="recordDetailModal">
+    <div class="dialog medium">
+      <div class="dialog-header"><h2 id="recordDetailTitle">SKU摊分明细</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body"><div class="table-wrap"><table><thead><tr><th>入库单号</th><th>商品SKU</th><th>发货数量</th><th>商品总体积</th><th>摊分占比</th><th>摊分金额(￥)</th><th>单件特殊费用(￥)</th></tr></thead><tbody id="recordDetailRows"></tbody></table></div></div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">关闭</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="errorModal">
+    <div class="dialog small">
+      <div class="dialog-header"><h2>特殊费用补摊失败</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body"><div class="notice danger">以下注册SKU当前库存小于关联已上架入库单的汇总数量，本次不更新任何费用及成本。</div><div class="table-wrap"><table style="min-width:0"><thead><tr><th>注册SKU</th><th>关联已上架入库单</th><th>需校验数量</th><th>当前库存</th></tr></thead><tbody id="errorRows"></tbody></table></div></div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">关闭</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="stageErrorModal">
+    <div class="dialog small">
+      <div class="dialog-header"><h2>暂不允许操作</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body"><div class="notice danger">同一物流商单下存在未摊分和已摊分入库单。请先统一摊分状态后再操作特殊费用。</div><div class="table-wrap"><table style="min-width:0"><thead><tr><th>入库单号</th><th>摊分状态</th></tr></thead><tbody id="stageErrorRows"></tbody></table></div></div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">关闭</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="confirmModal">
+    <div class="dialog medium">
+      <div class="dialog-header"><h2>PRD前置业务确认</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body">
+        <div class="notice warning">全部确认后再生成正式PRD。本原型不调用真实业务数据。</div>
+        <div class="check-list" id="confirmationList"></div>
+        <div class="confirm-fields"><div class="stack-field"><label for="confirmer">业务确认人</label><input id="confirmer" placeholder="填写姓名"></div><div class="stack-field"><label for="confirmDate">确认日期</label><input id="confirmDate" type="date"></div></div>
+      </div>
+      <div class="dialog-footer"><button class="btn" id="confirmAll" type="button">全部确认</button><button class="btn primary" id="saveConfirmation" type="button">保存确认结果</button></div>
+    </div>
+  </div>
+
+  <div class="modal" id="reApportionModal">
+    <div class="dialog medium">
+      <div class="dialog-header"><h2>重新摊分</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body">
+        <div class="notice">重新摊分仅纠正原有四类费用。已累计特殊费用保持不变，不参与覆盖计算。</div>
+        <div class="field" style="max-width:460px"><label for="expressNo">物流商单号</label><input id="expressNo" value="GLLCJ26071302638THE"></div>
+        <div class="summary-strip" style="margin-top:14px"><div class="summary-cell"><span>箱子+人力成本(￥)</span><strong>420.00</strong></div><div class="summary-cell"><span>国内物流(￥)</span><strong>680.00</strong></div><div class="summary-cell"><span>海外仓头程(￥)</span><strong>3,860.00</strong></div><div class="summary-cell"><span>VAT+关税(￥)</span><strong>920.00</strong></div></div>
+      </div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">取消</button><button class="btn primary" id="submitReApportion" type="button">更新入库成本</button></div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    (function () {
+      const orders = [
+        { id: 1, sellerOrderNo: 'WYT-RKD-2026-07-08-0010', orderNo: 'WYT-RKD-2026-07-08-0010', warehouse: '自建仓泰国', expressNo: 'GLLCJ26071302677THE', status: '运输中', feeStatus: '未摊分', skuCount: 2, productTypes: 309, itemCount: 2025, boxes: 7, weight: 141.27, volumeM3: 1.06, creator: '陈林生', saleChannel: '泰国-喜运达', actualChannel: '海运普货义乌', specialTotal: 0, createTime: '2026-07-13 09:18', preTime: '2026-07-08 15:13:55', submitTime: '2026-07-13 09:50:34' },
+        { id: 2, sellerOrderNo: 'WYT-RKD-2026-07-08-0014', orderNo: 'WYT-RKD-2026-07-08-0014', warehouse: '自建仓泰国', expressNo: 'GLLCJ26071302677THE', status: '运输中', feeStatus: '未摊分', skuCount: 2, productTypes: 300, itemCount: 1517, boxes: 7, weight: 110.45, volumeM3: 1.06, creator: '陈林生', saleChannel: '泰国-喜运达', actualChannel: '海运普货义乌', specialTotal: 0, createTime: '2026-07-13 09:42', preTime: '2026-07-08 16:25:15', submitTime: '2026-07-10 17:02:15' },
+        { id: 3, sellerOrderNo: 'WYT-RKD-2026-07-08-0015', orderNo: 'LVN-3309-1352-P', warehouse: '元仓越南胡志明', expressNo: 'GLLCJ26071302638THE', status: '已上架', feeStatus: '已摊分', skuCount: 2, productTypes: 791, itemCount: 16300, boxes: 96, weight: 1543.88, volumeM3: 9, creator: '王江杰', saleChannel: '越南-大境越', actualChannel: '陆运普货义乌', specialTotal: 0, createTime: '2026-07-13 10:06', preTime: '2026-07-08 16:29:23', submitTime: '2026-07-12 14:34:46' },
+        { id: 4, sellerOrderNo: 'WYT-RKD-2026-07-08-0016', orderNo: 'LVN-3309-1353-P', warehouse: '元仓越南胡志明', expressNo: 'GLLCJ26071302638THE', status: '运输中', feeStatus: '已摊分', skuCount: 2, productTypes: 562, itemCount: 10240, boxes: 64, weight: 986.22, volumeM3: 6.8, creator: '王江杰', saleChannel: '越南-大境越', actualChannel: '陆运普货义乌', specialTotal: 0, createTime: '2026-07-13 10:31', preTime: '2026-07-09 09:16:08', submitTime: '2026-07-12 16:20:18' },
+        { id: 5, sellerOrderNo: 'WYT-RKD-2026-07-08-0018', orderNo: 'WYT-RKD-2026-07-08-0018', warehouse: '万邑通美西仓', expressNo: 'GLLCJ26071302655THE', status: '运输中', feeStatus: '未摊分', skuCount: 2, productTypes: 342, itemCount: 4280, boxes: 24, weight: 626.34, volumeM3: 4.2, creator: '赵雨欣', saleChannel: '美国-万邑通', actualChannel: '海运普货深圳', specialTotal: 0, createTime: '2026-07-13 11:05', preTime: '2026-07-10 10:12:31', submitTime: '2026-07-13 08:52:09' },
+        { id: 6, sellerOrderNo: 'WYT-RKD-2026-07-08-0019', orderNo: 'WYT-RKD-2026-07-08-0019', warehouse: '万邑通美西仓', expressNo: 'GLLCJ26071302655THE', status: '已上架', feeStatus: '已摊分', skuCount: 2, productTypes: 280, itemCount: 3620, boxes: 18, weight: 512.16, volumeM3: 3.56, creator: '赵雨欣', saleChannel: '美国-万邑通', actualChannel: '海运普货深圳', specialTotal: 0, createTime: '2026-07-13 11:22', preTime: '2026-07-10 11:06:42', submitTime: '2026-07-13 09:18:25' }
+      ];
+
+      const skuCatalog = {
+        1: [
+          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 20, volume: 880000, stock: 156, baseCost: 118.6 },
+          { sku: 'B2036', name: '厨房置物架', registerSku: 'US-B2036-SL', quantity: 24, volume: 1296000, stock: 88, baseCost: 96.4 }
+        ],
+        2: [
+          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 20, volume: 880000, stock: 156, baseCost: 118.6 },
+          { sku: 'C3098', name: '户外折叠椅', registerSku: 'US-C3098-GR', quantity: 16, volume: 1920000, stock: 61, baseCost: 132.8 }
+        ],
+        3: [
+          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 40, volume: 1760000, stock: 156, baseCost: 118.6 },
+          { sku: 'G7015', name: '宠物围栏', registerSku: 'US-G7015-BK', quantity: 36, volume: 2268000, stock: 18, baseCost: 145.2 }
+        ],
+        4: [
+          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 20, volume: 880000, stock: 156, baseCost: 118.6 },
+          { sku: 'H8020', name: '露营灯支架', registerSku: 'US-H8020-BK', quantity: 20, volume: 440000, stock: 33, baseCost: 57.6 }
+        ],
+        5: [
+          { sku: 'D4012', name: '浴室防滑垫', registerSku: 'UK-D4012-GY', quantity: 35, volume: 630000, stock: 72, baseCost: 42.5 },
+          { sku: 'F6088', name: '可折叠洗衣篮', registerSku: 'UK-F6088-WH', quantity: 20, volume: 820000, stock: 49, baseCost: 71.3 }
+        ],
+        6: [
+          { sku: 'E5024', name: '真空压缩袋套装', registerSku: 'UK-E5024-TR', quantity: 50, volume: 375000, stock: 132, baseCost: 28.2 },
+          { sku: 'K1002', name: '可叠放鞋盒', registerSku: 'UK-K1002-TR', quantity: 30, volume: 540000, stock: 86, baseCost: 35.6 }
+        ]
+      };
+
+      const recordsByExpress = {
+        GLLCJ26071302677THE: [],
+        GLLCJ26071302638THE: [
+          { type: '首次摊分', name: '超长附加费', amount: 680, method: '按体积', selected: ['A1001', 'G7015', 'H8020'], operator: '罗晓靓', time: '2026-07-10 14:36' },
+          { type: '补摊', name: '查验费', amount: 520, method: '按数量', selected: ['A1001', 'H8020'], operator: '罗晓靓', time: '2026-07-12 10:18' },
+          { type: '冲减', name: '查验费冲减', amount: -120, method: '按数量', selected: ['A1001', 'H8020'], operator: '罗晓靓', time: '2026-07-13 09:05' }
+        ],
+        GLLCJ26071302655THE: [
+          { type: '首次摊分', name: '其他作业费', amount: 240, method: '按数量', selected: ['E5024'], orderIds: [6], operator: '罗晓靓', time: '2026-07-11 16:20' }
+        ]
+      };
+
+      const confirmations = [
+        ['特殊费用按物流商单号统一处理', '一次加载其下全部有效入库单，不支持仅选择其中一张入库单。'],
+        ['关联入库单摊分状态必须一致', '全部未摊分进入首次摊分；全部已摊分进入补摊；状态混合时不允许操作。'],
+        ['每笔费用独立选择摊分方式和商品SKU', '支持按数量或按体积；同一商品SKU跨多入库单出现时只选择一次。'],
+        ['分母包含所有关联入库单的选中SKU明细', '数量、体积、精度和舍入沿用现有摊分；缺少体积时整笔阻断。'],
+        ['允许关联入库单上架状态不一致', '未上架只更新入库SKU成本；已上架同时修正当前库存平均成本。'],
+        ['已上架SKU按注册SKU汇总校验当前库存', '任一库存不足整笔失败；负数冲减后入库成本不得小于0。'],
+        ['保存后直接生效并保留完整记录', '复用现有权限；记录主维度为物流商单号，明细保留入库单号和SKU，已执行记录不可改删。'],
+        ['重新摊分保留特殊费用', '只重算原四类费用；本次不追溯历史出库成本、不重算利润、不增加导出字段。']
+      ];
+
+      let currentOrder = orders[0];
+      let currentExpressNo = 'GLLCJ26071302677THE';
+      let currentRecordExpressNo = 'GLLCJ26071302638THE';
+      let feeMode = 'initial';
+      let currentFeeIndex = 0;
+      let feeRows = [];
+      let filteredOrders = orders.slice();
+
+      function money(value) { return Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+      function escapeHtml(value) {
+        return String(value == null ? '' : value).replace(/[&<>"']/g, function (char) {
+          return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char];
+        });
+      }
+      function modal(id, show) { document.getElementById(id).classList.toggle('show', show); }
+      function showToast(message) {
+        const toast = document.getElementById('toast');
+        toast.textContent = message;
+        toast.classList.add('show');
+        setTimeout(function () { toast.classList.remove('show'); }, 2200);
+      }
+      function orderById(id) { return orders.find(function (item) { return item.id === Number(id); }); }
+      function groupOrders(expressNo) { return orders.filter(function (item) { return item.expressNo === expressNo; }); }
+      function groupMode(expressNo) {
+        const statuses = Array.from(new Set(groupOrders(expressNo).map(function (item) { return item.feeStatus; })));
+        if (statuses.length !== 1) return 'mixed';
+        return statuses[0] === '未摊分' ? 'initial' : 'supplement';
+      }
+      function groupSkuRows(expressNo) {
+        const rows = [];
+        groupOrders(expressNo).forEach(function (order) {
+          (skuCatalog[order.id] || []).forEach(function (sku) {
+            rows.push(Object.assign({ orderId: order.id, orderNo: order.orderNo, orderStatus: order.status }, sku));
+          });
+        });
+        return rows;
+      }
+      function groupSkus(expressNo) {
+        const result = {};
+        groupSkuRows(expressNo).forEach(function (row) {
+          if (!result[row.sku]) {
+            result[row.sku] = {
+              sku: row.sku,
+              name: row.name,
+              registerSkus: [],
+              orderNos: [],
+              quantity: 0,
+              volume: 0,
+              stock: row.stock,
+              missingVolume: false
+            };
+          }
+          const item = result[row.sku];
+          if (!item.registerSkus.includes(row.registerSku)) item.registerSkus.push(row.registerSku);
+          if (!item.orderNos.includes(row.orderNo)) item.orderNos.push(row.orderNo);
+          item.quantity += row.quantity;
+          item.volume += Number(row.volume || 0);
+          item.stock = Math.min(item.stock, row.stock);
+          item.missingVolume = item.missingVolume || Number(row.volume || 0) <= 0;
+        });
+        return Object.values(result);
+      }
+      function allocationDetails(record, expressNo) {
+        if (record.details) return record.details;
+        const selected = new Set(record.selected || []);
+        const allowedOrders = record.orderIds ? new Set(record.orderIds) : null;
+        const rows = groupSkuRows(expressNo).filter(function (row) {
+          return selected.has(row.sku) && (!allowedOrders || allowedOrders.has(row.orderId));
+        });
+        const basis = rows.reduce(function (sum, row) {
+          return sum + (record.method === '按数量' ? row.quantity : row.volume);
+        }, 0);
+        if (!basis) return [];
+        return rows.map(function (row) {
+          const factor = record.method === '按数量' ? row.quantity : row.volume;
+          const ratio = factor / basis;
+          const amount = Number(record.amount) * ratio;
+          return Object.assign({}, row, { ratio: ratio, amount: amount, unitAmount: amount / row.quantity });
+        });
+      }
+      function syncOrderSpecialTotals(expressNo) {
+        const records = recordsByExpress[expressNo] || [];
+        groupOrders(expressNo).forEach(function (order) {
+          order.specialTotal = records.reduce(function (sum, record) {
+            return sum + allocationDetails(record, expressNo).filter(function (detail) {
+              return detail.orderId === order.id;
+            }).reduce(function (part, detail) { return part + detail.amount; }, 0);
+          }, 0);
+        });
+      }
+
+      function renderOrders() {
+        const body = document.querySelector('#orderTable tbody');
+        body.innerHTML = filteredOrders.map(function (order) {
+          const specialAmount = order.specialTotal
+            ? '<span class="money-link record-link" data-id="' + order.id + '">' + money(order.specialTotal) + '</span>'
+            : '<span>0.00</span>';
+          return '<tr data-order="' + order.orderNo + '" data-warehouse="' + order.warehouse + '" data-status="' + order.status + '" data-fee="' + order.feeStatus + '">' +
+            '<td><input type="checkbox" class="row-select" value="' + order.id + '" aria-label="选择' + order.orderNo + '"></td>' +
+            '<td><button class="btn link order-link sim-action" type="button">' + order.sellerOrderNo + '</button></td>' +
+            '<td><strong>' + order.orderNo + '</strong></td>' +
+            '<td>' + order.expressNo + '</td>' +
+            '<td>' + order.warehouse + '</td>' +
+            '<td><div class="channel-lines"><span class="muted-line">销售:' + order.saleChannel + '</span><br>' + order.actualChannel + '<br><span class="muted-line">真实:' + order.saleChannel + '</span><br>' + order.actualChannel + '</div></td>' +
+            '<td>' + order.boxes + '</td>' +
+            '<td>' + money(order.weight) + '</td>' +
+            '<td>' + order.productTypes + '</td>' +
+            '<td>' + order.itemCount + '</td>' +
+            '<td><span class="status ' + (order.feeStatus === '已摊分' ? 'green' : 'gray') + '">' + order.feeStatus + '</span></td>' +
+            '<td class="special-col"><div class="special-cell">' + specialAmount + '<button class="btn link detail-action" data-id="' + order.id + '" type="button">摊分详情</button></div></td>' +
+            '<td>' + order.volumeM3 + '</td>' +
+            '<td>' + order.creator + '</td>' +
+            '<td><div class="time-lines">预建:' + order.preTime + '<br>提交:' + order.submitTime + '<br>发货:</div></td>' +
+            '<td><div class="operation-stack"><button class="op-btn sim-action" type="button">日志</button><button class="op-btn sim-action" type="button">打印箱唛</button><button class="op-btn sim-action" type="button">导出模板</button><button class="op-btn warm sim-action" type="button">' + (order.status === '已上架' ? '查看' : '发货') + '</button><button class="op-btn warm sim-action" type="button">修改物流</button><button class="op-btn danger sim-action" type="button">作废</button></div></td></tr>';
+        }).join('') || '<tr><td colspan="16"><div class="empty">暂无符合条件的数据</div></td></tr>';
+        document.getElementById('rowCount').textContent = filteredOrders.length;
+      }
+
+      function renderOrderSummary(targetId, order) {
+        document.getElementById(targetId).innerHTML = [
+          ['入库单号', order.orderNo], ['收货仓库', order.warehouse], ['入库状态', order.status], ['摊分状态', order.feeStatus]
+        ].map(function (item) { return '<div class="summary-cell"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join('');
+      }
+
+      function newFeeRow() { return { name: '', amount: '', method: '按数量', selected: [] }; }
+
+      function renderGroupPreview() {
+        const expressNo = document.getElementById('groupSelect').value;
+        const mode = groupMode(expressNo);
+        const group = groupOrders(expressNo);
+        const stateText = mode === 'initial' ? '全部未摊分，可执行首次摊分' : (mode === 'supplement' ? '全部已摊分，可执行特殊费用补摊' : '摊分状态不一致，不允许操作');
+        document.getElementById('groupStateHint').textContent = stateText;
+        document.getElementById('groupStateHint').style.color = mode === 'mixed' ? '#c53b3b' : '#1f8f5f';
+        document.getElementById('groupPreviewRows').innerHTML = group.map(function (order) {
+          return '<tr><td>' + order.orderNo + '</td><td>' + order.warehouse + '</td><td>' + order.status + '</td><td>' + order.feeStatus + '</td><td>' + order.skuCount + '</td></tr>';
+        }).join('');
+      }
+      function openGroupSelector() {
+        renderGroupPreview();
+        modal('groupModal', true);
+      }
+      function openFee(expressNo) {
+        currentExpressNo = expressNo;
+        feeMode = groupMode(expressNo);
+        const group = groupOrders(expressNo);
+        feeRows = [newFeeRow()];
+        document.getElementById('feeDialogTitle').textContent = feeMode === 'initial' ? '摊分费用' : '特殊费用补摊';
+        document.getElementById('baseFeeSection').style.display = feeMode === 'initial' ? 'block' : 'none';
+        document.getElementById('feeGroupSummary').innerHTML = [
+          ['物流商单号', expressNo],
+          ['关联入库单', group.length + '张'],
+          ['收货仓库', Array.from(new Set(group.map(function (item) { return item.warehouse; }))).join('、')],
+          ['本次处理', feeMode === 'initial' ? '首次摊分' : '特殊费用补摊']
+        ].map(function (item) {
+          return '<div class="summary-cell"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>';
+        }).join('');
+        document.getElementById('feeGroupOrderRows').innerHTML = group.map(function (order) {
+          return '<tr><td>' + order.orderNo + '</td><td>' + order.status + '</td><td>' + order.feeStatus + '</td><td>' + order.skuCount + '</td></tr>';
+        }).join('');
+        const shelvedCount = group.filter(function (order) { return order.status === '已上架'; }).length;
+        document.getElementById('feeNotice').innerHTML = feeMode === 'initial'
+          ? '<strong>首次摊分：</strong>特殊费用与原有四类费用一并执行，按选中商品SKU写入各关联入库单成本。'
+          : '<strong>补摊：</strong>只追加或冲减本次特殊费用，不重算原四类费用。' + (shelvedCount ? ' 其中' + shelvedCount + '张已上架入库单需校验当前库存并修正库存平均成本；未上架入库单只更新入库SKU成本。' : ' 关联入库单均未上架，只更新入库SKU成本。');
+        renderFeeRows();
+        modal('feeModal', true);
+      }
+
+      function renderFeeRows() {
+        const body = document.getElementById('feeRows');
+        body.innerHTML = feeRows.map(function (row, index) {
+          const skuText = row.selected.length ? (row.selected.length > 2 ? row.selected.slice(0, 2).join('、') + ' 等' + row.selected.length + '个' : row.selected.join('、')) : '未选择';
+          return '<tr><td>' + (index + 1) + '</td>' +
+            '<td><input class="fee-name" data-index="' + index + '" value="' + escapeHtml(row.name) + '" placeholder="手工填写"></td>' +
+            '<td><input class="fee-amount" data-index="' + index + '" type="number" step="0.01" value="' + row.amount + '" placeholder="支持正数/负数"></td>' +
+            '<td><select class="fee-method" data-index="' + index + '"><option' + (row.method === '按数量' ? ' selected' : '') + '>按数量</option><option' + (row.method === '按体积' ? ' selected' : '') + '>按体积</option></select></td>' +
+            '<td><div class="sku-summary">' + skuText + '</div><button class="btn link choose-sku" data-index="' + index + '" type="button">选择商品SKU</button></td>' +
+            '<td><button class="btn icon danger remove-fee" data-index="' + index + '" type="button" title="删除">×</button></td></tr>';
+        }).join('');
+        const total = feeRows.reduce(function (sum, row) { return sum + Number(row.amount || 0); }, 0);
+        document.getElementById('feeTotal').textContent = '￥' + money(total);
+      }
+
+      function openSkuSelector(index) {
+        currentFeeIndex = Number(index);
+        const selected = feeRows[currentFeeIndex].selected;
+        const skus = groupSkus(currentExpressNo);
+        document.getElementById('skuRows').innerHTML = skus.map(function (sku) {
+          return '<tr><td><input type="checkbox" class="sku-check" value="' + sku.sku + '"' + (selected.includes(sku.sku) ? ' checked' : '') + '></td><td>' + sku.orderNos.join('<br>') + '</td><td>' + sku.sku + '</td><td>' + sku.name + '</td><td>' + sku.registerSkus.join('、') + '</td><td>' + sku.quantity + '</td><td>' + sku.volume.toLocaleString('zh-CN') + '</td><td>' + sku.stock + '</td></tr>';
+        }).join('');
+        document.getElementById('selectAllSkus').checked = selected.length === skus.length;
+        modal('skuModal', true);
+      }
+
+      function validateFees() {
+        if (!feeRows.length) return '请至少新增一笔特殊费用';
+        for (let i = 0; i < feeRows.length; i += 1) {
+          const row = feeRows[i];
+          if (!row.name.trim()) return '第' + (i + 1) + '笔费用名称不能为空';
+          if (!row.amount || Number(row.amount) === 0) return '第' + (i + 1) + '笔费用金额不能为0';
+          if (!row.selected.length) return '第' + (i + 1) + '笔费用请选择承担商品SKU';
+          if (row.method === '按体积') {
+            const invalid = groupSkus(currentExpressNo).filter(function (sku) { return row.selected.includes(sku.sku) && sku.missingVolume; });
+            if (invalid.length) return '商品SKU ' + invalid.map(function (sku) { return sku.sku; }).join('、') + ' 缺少有效体积';
+          }
+        }
+        const skuDeltas = {};
+        feeRows.forEach(function (row) {
+          allocationDetails(row, currentExpressNo).forEach(function (detail) {
+            const key = detail.orderId + '|' + detail.sku;
+            skuDeltas[key] = (skuDeltas[key] || 0) + detail.unitAmount;
+          });
+        });
+        const belowZero = groupSkuRows(currentExpressNo).filter(function (sku) {
+          return skuDeltas[sku.orderId + '|' + sku.sku] && sku.baseCost + skuDeltas[sku.orderId + '|' + sku.sku] < 0;
+        });
+        if (belowZero.length) return '冲减后 ' + belowZero.map(function (sku) { return sku.orderNo + '/' + sku.sku; }).join('、') + ' 的入库成本小于0';
+        return '';
+      }
+
+      function insufficientStock() {
+        if (feeMode !== 'supplement') return [];
+        const selectedSet = new Set();
+        feeRows.forEach(function (row) { row.selected.forEach(function (sku) { selectedSet.add(sku); }); });
+        const registerSkuTotals = {};
+        groupSkuRows(currentExpressNo).filter(function (sku) {
+          return sku.orderStatus === '已上架' && selectedSet.has(sku.sku);
+        }).forEach(function (sku) {
+          if (!registerSkuTotals[sku.registerSku]) registerSkuTotals[sku.registerSku] = { registerSku: sku.registerSku, quantity: 0, stock: sku.stock, orderNos: [] };
+          registerSkuTotals[sku.registerSku].quantity += sku.quantity;
+          registerSkuTotals[sku.registerSku].stock = Math.min(registerSkuTotals[sku.registerSku].stock, sku.stock);
+          if (!registerSkuTotals[sku.registerSku].orderNos.includes(sku.orderNo)) registerSkuTotals[sku.registerSku].orderNos.push(sku.orderNo);
+        });
+        return Object.values(registerSkuTotals).filter(function (sku) { return sku.stock < sku.quantity; });
+      }
+
+      function openDetail(order) {
+        currentOrder = order;
+        currentRecordExpressNo = order.expressNo;
+        renderOrderSummary('detailSummary', order);
+        document.getElementById('detailRows').innerHTML = skuCatalog[order.id].map(function (sku, index) {
+          const special = (recordsByExpress[order.expressNo] || []).reduce(function (sum, record) {
+            return sum + allocationDetails(record, order.expressNo).filter(function (detail) {
+              return detail.orderId === order.id && detail.sku === sku.sku;
+            }).reduce(function (part, detail) { return part + detail.unitAmount; }, 0);
+          }, 0);
+          return '<tr><td>' + sku.registerSku + '</td><td>' + sku.sku + '</td><td>' + sku.name + '</td><td>' + sku.quantity + '</td><td>5.25</td><td>34.80</td><td>6.40</td><td>8.10</td><td>' + money(special) + '</td><td>' + money(sku.baseCost + special) + '</td></tr>';
+        }).join('');
+        document.getElementById('openRecords').textContent = '￥' + money(order.specialTotal);
+        modal('detailModal', true);
+      }
+
+      function openRecords(expressNo) {
+        currentRecordExpressNo = expressNo || currentRecordExpressNo;
+        const records = recordsByExpress[currentRecordExpressNo] || [];
+        const group = groupOrders(currentRecordExpressNo);
+        const total = records.reduce(function (sum, record) { return sum + Number(record.amount); }, 0);
+        document.getElementById('recordNotice').innerHTML = '<strong>物流商单号：</strong>' + currentRecordExpressNo + '，关联' + group.length + '张入库单，特殊费用累计￥' + money(total) + '。记录明细保留入库单号和商品SKU。';
+        document.getElementById('recordRows').innerHTML = records.map(function (record, index) {
+          return '<tr><td><span class="status ' + (record.type === '冲减' ? 'orange' : 'green') + '">' + record.type + '</span></td><td>' + record.name + '</td><td>' + money(record.amount) + '</td><td>' + record.method + '</td><td>' + record.selected.length + '</td><td>' + record.operator + '</td><td>' + record.time + '</td><td><button class="btn link record-detail" data-index="' + index + '" type="button">查看明细</button></td></tr>';
+        }).join('') || '<tr><td colspan="8"><div class="empty">暂无特殊费用摊分记录</div></td></tr>';
+        modal('recordsModal', true);
+      }
+
+      function openRecordDetail(index) {
+        const record = (recordsByExpress[currentRecordExpressNo] || [])[Number(index)];
+        const rows = allocationDetails(record, currentRecordExpressNo);
+        document.getElementById('recordDetailTitle').textContent = record.name + ' - SKU摊分明细';
+        document.getElementById('recordDetailRows').innerHTML = rows.map(function (sku) {
+          return '<tr><td>' + sku.orderNo + '</td><td>' + sku.sku + '</td><td>' + sku.quantity + '</td><td>' + sku.volume.toLocaleString('zh-CN') + '</td><td>' + (sku.ratio * 100).toFixed(4) + '%</td><td>' + money(sku.amount) + '</td><td>' + money(sku.unitAmount) + '</td></tr>';
+        }).join('');
+        modal('recordDetailModal', true);
+      }
+
+      function renderConfirmations() {
+        const saved = JSON.parse(localStorage.getItem('special-fee-confirmation-v2') || '{}');
+        document.getElementById('confirmationList').innerHTML = confirmations.map(function (item, index) {
+          const checked = saved.checked && saved.checked[index];
+          return '<div class="check-row"><input type="checkbox" id="confirm-' + index + '"' + (checked ? ' checked' : '') + '><label for="confirm-' + index + '">' + item[0] + '<small>' + item[1] + '</small></label><span class="check-state">' + (checked ? '已确认' : '待确认') + '</span></div>';
+        }).join('');
+        document.getElementById('confirmer').value = saved.confirmer || '';
+        document.getElementById('confirmDate').value = saved.confirmDate || new Date().toISOString().slice(0, 10);
+        updateConfirmCount();
+      }
+
+      function updateConfirmCount() {
+        const boxes = Array.from(document.querySelectorAll('#confirmationList input[type="checkbox"]'));
+        boxes.forEach(function (box) {
+          box.closest('.check-row').classList.toggle('checked', box.checked);
+          box.closest('.check-row').querySelector('.check-state').textContent = box.checked ? '已确认' : '待确认';
+        });
+        const count = boxes.filter(function (box) { return box.checked; }).length;
+        document.getElementById('confirmCount').textContent = count + '/' + confirmations.length;
+        document.getElementById('confirmDot').style.background = count === confirmations.length ? '#1f8f5f' : '#d97706';
+      }
+
+      document.addEventListener('click', function (event) {
+        const statusTab = event.target.closest('.status-tab');
+        if (statusTab) {
+          document.querySelectorAll('.status-tab').forEach(function (tab) { tab.classList.remove('active'); });
+          statusTab.classList.add('active');
+          showToast('已切换至' + statusTab.textContent.trim());
+        }
+        const simulated = event.target.closest('.sim-action');
+        if (simulated) showToast(simulated.textContent.trim() + '：原有功能交互示意');
+        const detailAction = event.target.closest('.detail-action');
+        if (detailAction) openDetail(orderById(detailAction.dataset.id));
+        const recordLink = event.target.closest('.record-link');
+        if (recordLink) {
+          currentOrder = orderById(recordLink.dataset.id);
+          openRecords(currentOrder.expressNo);
+        }
+        const close = event.target.closest('.close-modal');
+        if (close) close.closest('.modal').classList.remove('show');
+        const choose = event.target.closest('.choose-sku');
+        if (choose) openSkuSelector(choose.dataset.index);
+        const remove = event.target.closest('.remove-fee');
+        if (remove) { feeRows.splice(Number(remove.dataset.index), 1); renderFeeRows(); }
+        const recordDetail = event.target.closest('.record-detail');
+        if (recordDetail) openRecordDetail(recordDetail.dataset.index);
+        if (event.target.classList.contains('modal')) event.target.classList.remove('show');
+      });
+
+      document.getElementById('feeRows').addEventListener('input', function (event) {
+        const index = Number(event.target.dataset.index);
+        if (event.target.classList.contains('fee-name')) feeRows[index].name = event.target.value;
+        if (event.target.classList.contains('fee-amount')) feeRows[index].amount = event.target.value;
+        if (event.target.classList.contains('fee-method')) feeRows[index].method = event.target.value;
+        const total = feeRows.reduce(function (sum, row) { return sum + Number(row.amount || 0); }, 0);
+        document.getElementById('feeTotal').textContent = '￥' + money(total);
+      });
+      document.getElementById('feeRows').addEventListener('change', function (event) {
+        if (event.target.classList.contains('fee-method')) feeRows[Number(event.target.dataset.index)].method = event.target.value;
+      });
+      document.getElementById('addFeeRow').addEventListener('click', function () { feeRows.push(newFeeRow()); renderFeeRows(); });
+      document.getElementById('selectAllSkus').addEventListener('change', function (event) { document.querySelectorAll('.sku-check').forEach(function (box) { box.checked = event.target.checked; }); });
+      document.getElementById('confirmSkuSelection').addEventListener('click', function () {
+        feeRows[currentFeeIndex].selected = Array.from(document.querySelectorAll('.sku-check:checked')).map(function (box) { return box.value; });
+        modal('skuModal', false);
+        renderFeeRows();
+      });
+      document.getElementById('submitFees').addEventListener('click', function () {
+        const error = validateFees();
+        if (error) { showToast(error); return; }
+        const insufficient = insufficientStock();
+        if (insufficient.length) {
+          document.getElementById('errorRows').innerHTML = insufficient.map(function (sku) { return '<tr><td>' + sku.registerSku + '</td><td>' + sku.orderNos.join('、') + '</td><td>' + sku.quantity + '</td><td>' + sku.stock + '</td></tr>'; }).join('');
+          modal('errorModal', true);
+          return;
+        }
+        if (!recordsByExpress[currentExpressNo]) recordsByExpress[currentExpressNo] = [];
+        feeRows.forEach(function (row) {
+          recordsByExpress[currentExpressNo].push({
+            type: feeMode === 'initial' ? '首次摊分' : (Number(row.amount) < 0 ? '冲减' : '补摊'),
+            name: row.name.trim(),
+            amount: Number(row.amount),
+            method: row.method,
+            selected: row.selected.slice(),
+            details: allocationDetails(row, currentExpressNo),
+            operator: '罗晓靓',
+            time: '2026-07-13 16:30'
+          });
+        });
+        if (feeMode === 'initial') groupOrders(currentExpressNo).forEach(function (order) { order.feeStatus = '已摊分'; });
+        syncOrderSpecialTotals(currentExpressNo);
+        renderOrders();
+        modal('feeModal', false);
+        showToast((feeMode === 'initial' ? '摊分成功' : '补摊成功') + '，已更新' + groupOrders(currentExpressNo).length + '张关联入库单');
+      });
+      document.getElementById('openRecords').addEventListener('click', function () { openRecords(currentOrder.expressNo); });
+      document.getElementById('openSpecialFee').addEventListener('click', openGroupSelector);
+      document.getElementById('groupSelect').addEventListener('change', renderGroupPreview);
+      document.getElementById('continueSpecialFee').addEventListener('click', function () {
+        const expressNo = document.getElementById('groupSelect').value;
+        const mode = groupMode(expressNo);
+        if (mode === 'mixed') {
+          document.getElementById('stageErrorRows').innerHTML = groupOrders(expressNo).map(function (order) {
+            return '<tr><td>' + order.orderNo + '</td><td>' + order.feeStatus + '</td></tr>';
+          }).join('');
+          modal('groupModal', false);
+          modal('stageErrorModal', true);
+          return;
+        }
+        modal('groupModal', false);
+        openFee(expressNo);
+      });
+      document.getElementById('openConfirm').addEventListener('click', function () { renderConfirmations(); modal('confirmModal', true); });
+      document.getElementById('confirmationList').addEventListener('change', updateConfirmCount);
+      document.getElementById('confirmAll').addEventListener('click', function () { document.querySelectorAll('#confirmationList input').forEach(function (box) { box.checked = true; }); updateConfirmCount(); });
+      document.getElementById('saveConfirmation').addEventListener('click', function () {
+        const boxes = Array.from(document.querySelectorAll('#confirmationList input[type="checkbox"]'));
+        localStorage.setItem('special-fee-confirmation-v2', JSON.stringify({ checked: boxes.map(function (box) { return box.checked; }), confirmer: document.getElementById('confirmer').value, confirmDate: document.getElementById('confirmDate').value }));
+        modal('confirmModal', false);
+        showToast('业务确认结果已保存在当前浏览器');
+        updateConfirmCount();
+      });
+      document.getElementById('openReApportion').addEventListener('click', function () { modal('reApportionModal', true); });
+      document.getElementById('submitReApportion').addEventListener('click', function () { modal('reApportionModal', false); showToast('重新摊分成功，特殊费用保持不变'); });
+      document.getElementById('selectAllOrders').addEventListener('change', function (event) {
+        document.querySelectorAll('.row-select').forEach(function (box) { box.checked = event.target.checked; });
+      });
+      document.getElementById('runSearch').addEventListener('click', function () {
+        const orderText = document.getElementById('orderSearch').value.trim();
+        const expressText = document.getElementById('expressSearch').value.trim();
+        const warehouse = document.getElementById('warehouseSearch').value;
+        const status = document.getElementById('statusSearch').value;
+        const feeStatus = document.getElementById('feeStatusSearch').value;
+        filteredOrders = orders.filter(function (order) {
+          return (!orderText || order.orderNo.includes(orderText) || order.sellerOrderNo.includes(orderText)) &&
+            (!expressText || order.expressNo.includes(expressText)) &&
+            (!warehouse || order.warehouse === warehouse) &&
+            (!status || order.status === status) &&
+            (!feeStatus || order.feeStatus === feeStatus);
+        });
+        renderOrders();
+      });
+      document.getElementById('resetSearch').addEventListener('click', function () {
+        document.getElementById('orderSearch').value = '';
+        document.getElementById('expressSearch').value = '';
+        document.getElementById('warehouseSearch').value = '';
+        document.getElementById('statusSearch').value = '';
+        document.getElementById('feeStatusSearch').value = '';
+        filteredOrders = orders.slice();
+        renderOrders();
+      });
+
+      Object.keys(recordsByExpress).forEach(syncOrderSpecialTotals);
+      renderOrders();
+      renderGroupPreview();
+      renderConfirmations();
+    }());
+  </script>
+</body>
+</html>
