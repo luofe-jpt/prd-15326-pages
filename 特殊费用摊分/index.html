@@ -338,7 +338,7 @@
       <div class="dialog-header"><h2>选择物流商单</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
       <div class="dialog-body">
         <div class="notice">特殊费用按物流商单号统一处理，系统将加载其下全部有效入库单。</div>
-        <div class="field" style="max-width:620px"><label for="groupSelect">物流商单号</label><select id="groupSelect"><option value="GLLCJ26071302677THE">GLLCJ26071302677THE（2张，全部未摊分）</option><option value="GLLCJ26071302638THE">GLLCJ26071302638THE（2张，全部已摊分，上架状态不一致）</option><option value="GLLCJ26071302655THE">GLLCJ26071302655THE（2张，摊分状态不一致）</option></select></div>
+        <div class="field" style="max-width:620px"><label for="groupSelect">物流商单号</label><select id="groupSelect"><option value="GLLCJ26071302677THE">GLLCJ26071302677THE（2张，全部未摊分）</option><option value="GLLCJ26071302638THE">GLLCJ26071302638THE（2张，全部已摊分，上架状态不一致）</option><option value="GLLCJ26071302655THE">GLLCJ26071302655THE（2张，摊分状态不一致，演示不阻断）</option></select></div>
         <div class="section-title"><h3>关联入库单</h3><span class="hint" id="groupStateHint"></span></div>
         <div class="table-wrap"><table><thead><tr><th>入库单号</th><th>收货仓库</th><th>入库状态</th><th>摊分状态</th><th>商品SKU数</th></tr></thead><tbody id="groupPreviewRows"></tbody></table></div>
       </div>
@@ -509,7 +509,7 @@
 
       const confirmations = [
         ['特殊费用按物流商单号统一处理', '一次加载其下全部有效入库单，不支持仅选择其中一张入库单。'],
-        ['关联入库单摊分状态必须一致', '全部未摊分进入首次摊分；全部已摊分进入补摊；状态混合时不允许操作。'],
+        ['不校验关联入库单摊分状态（feeStatus）', '已上架走重新摊分路径（更新 package 成本 + 修正库存成本）；未上架只更新 package 成本；无需整单阻断。'],
         ['每笔费用独立选择摊分方式和商品SKU', '支持按数量或按体积；同一商品SKU跨多入库单出现时只选择一次。'],
         ['分母包含所有关联入库单的选中SKU明细', '数量、体积、精度和舍入沿用现有摊分；缺少体积时整笔阻断。'],
         ['允许关联入库单上架状态不一致', '未上架只更新入库SKU成本；已上架同时修正当前库存平均成本。'],
@@ -543,7 +543,7 @@
       function groupOrders(expressNo) { return orders.filter(function (item) { return item.expressNo === expressNo; }); }
       function groupMode(expressNo) {
         const statuses = Array.from(new Set(groupOrders(expressNo).map(function (item) { return item.feeStatus; })));
-        if (statuses.length !== 1) return 'mixed';
+        if (statuses.length !== 1) return 'supplement';
         return statuses[0] === '未摊分' ? 'initial' : 'supplement';
       }
       function groupSkuRows(expressNo) {
@@ -648,9 +648,9 @@
         const expressNo = document.getElementById('groupSelect').value;
         const mode = groupMode(expressNo);
         const group = groupOrders(expressNo);
-        const stateText = mode === 'initial' ? '全部未摊分，可执行首次摊分' : (mode === 'supplement' ? '全部已摊分，可执行特殊费用补摊' : '摊分状态不一致，不允许操作');
+        const stateText = mode === 'initial' ? '全部未摊分，可执行首次摊分' : '可执行特殊费用摊分/补摊';
         document.getElementById('groupStateHint').textContent = stateText;
-        document.getElementById('groupStateHint').style.color = mode === 'mixed' ? '#c53b3b' : '#1f8f5f';
+        document.getElementById('groupStateHint').style.color = '#1f8f5f';
         document.getElementById('groupPreviewRows').innerHTML = group.map(function (order) {
           return '<tr><td>' + order.orderNo + '</td><td>' + order.warehouse + '</td><td>' + order.status + '</td><td>' + order.feeStatus + '</td><td>' + order.skuCount + '</td></tr>';
         }).join('');
@@ -664,13 +664,13 @@
         feeMode = groupMode(expressNo);
         const group = groupOrders(expressNo);
         feeRows = [newFeeRow()];
-        document.getElementById('feeDialogTitle').textContent = feeMode === 'initial' ? '摊分费用' : '特殊费用补摊';
-        document.getElementById('baseFeeSection').style.display = feeMode === 'initial' ? 'block' : 'none';
+        document.getElementById('feeDialogTitle').textContent = '特殊费用摊分/补摊';
+        document.getElementById('baseFeeSection').style.display = 'none';
         document.getElementById('feeGroupSummary').innerHTML = [
           ['物流商单号', expressNo],
           ['关联入库单', group.length + '张'],
           ['收货仓库', Array.from(new Set(group.map(function (item) { return item.warehouse; }))).join('、')],
-          ['本次处理', feeMode === 'initial' ? '首次摊分' : '特殊费用补摊']
+          ['本次处理', '特殊费用摊分/补摊']
         ].map(function (item) {
           return '<div class="summary-cell"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>';
         }).join('');
@@ -678,9 +678,8 @@
           return '<tr><td>' + order.orderNo + '</td><td>' + order.status + '</td><td>' + order.feeStatus + '</td><td>' + order.skuCount + '</td></tr>';
         }).join('');
         const shelvedCount = group.filter(function (order) { return order.status === '已上架'; }).length;
-        document.getElementById('feeNotice').innerHTML = feeMode === 'initial'
-          ? '<strong>首次摊分：</strong>特殊费用与原有四类费用一并执行，按选中商品SKU写入各关联入库单成本。'
-          : '<strong>补摊：</strong>只追加或冲减本次特殊费用，不重算原四类费用。' + (shelvedCount ? ' 其中' + shelvedCount + '张已上架入库单需校验当前库存并修正库存平均成本；未上架入库单只更新入库SKU成本。' : ' 关联入库单均未上架，只更新入库SKU成本。');
+        document.getElementById('feeNotice').innerHTML = '<strong>特殊费用摊分/补摊：</strong>按选中商品SKU摊分特殊费用，更新各关联入库单 package 成本。'
+          + (shelvedCount ? ' 其中' + shelvedCount + '张已上架入库单需校验当前库存并修正库存平均成本；未上架入库单只更新入库SKU成本。' : ' 关联入库单均未上架，只更新入库SKU成本。');
         renderFeeRows();
         modal('feeModal', true);
       }
@@ -884,22 +883,13 @@
         syncOrderSpecialTotals(currentExpressNo);
         renderOrders();
         modal('feeModal', false);
-        showToast((feeMode === 'initial' ? '摊分成功' : '补摊成功') + '，已更新' + groupOrders(currentExpressNo).length + '张关联入库单');
+        showToast('保存成功，已更新' + groupOrders(currentExpressNo).length + '张关联入库单');
       });
       document.getElementById('openRecords').addEventListener('click', function () { openRecords(currentOrder.expressNo); });
       document.getElementById('openSpecialFee').addEventListener('click', openGroupSelector);
       document.getElementById('groupSelect').addEventListener('change', renderGroupPreview);
       document.getElementById('continueSpecialFee').addEventListener('click', function () {
         const expressNo = document.getElementById('groupSelect').value;
-        const mode = groupMode(expressNo);
-        if (mode === 'mixed') {
-          document.getElementById('stageErrorRows').innerHTML = groupOrders(expressNo).map(function (order) {
-            return '<tr><td>' + order.orderNo + '</td><td>' + order.feeStatus + '</td></tr>';
-          }).join('');
-          modal('groupModal', false);
-          modal('stageErrorModal', true);
-          return;
-        }
         modal('groupModal', false);
         openFee(expressNo);
       });
