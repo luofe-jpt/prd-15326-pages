@@ -136,6 +136,7 @@
 
     .field { display: grid; grid-template-columns: 90px minmax(0, 1fr); align-items: center; gap: 8px; }
     .field label { color: #4d5158; text-align: right; white-space: nowrap; }
+    .group-query { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
     .modal { position: fixed; inset: 0; z-index: 50; display: none; align-items: center; justify-content: center; padding: 18px; background: rgba(18, 25, 38, .48); }
     .modal.show { display: flex; }
     .dialog { width: min(1100px, 96vw); max-height: 92vh; display: flex; flex-direction: column; border-radius: 2px; background: #fff; box-shadow: 0 14px 44px rgba(17, 24, 39, .24); }
@@ -300,7 +301,7 @@
               <button class="btn teal sim-action" type="button">补打商品标签</button>
               <button class="btn teal sim-action" type="button">同步入库单</button>
               <button class="btn blue sim-action" type="button">批量修改物流</button>
-              <button class="btn blue" id="openSpecialFee" type="button">特殊费用摊分/补摊 <span class="new-badge">新增</span></button>
+              <button class="btn blue" id="openSpecialFee" type="button">特殊费用摊分 <span class="new-badge">新增</span></button>
             </div>
           </div>
 
@@ -344,14 +345,14 @@
 
   <div class="modal" id="groupModal">
     <div class="dialog medium">
-      <div class="dialog-header"><h2>选择物流商单</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-header"><h2>查询物流商单</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
       <div class="dialog-body">
         <div class="notice">特殊费用按物流商单号统一处理，系统将加载其下全部有效入库单。</div>
-        <div class="field" style="max-width:620px"><label for="groupSelect">物流商单号</label><select id="groupSelect"><option value="GLLCJ26071302677THE">GLLCJ26071302677THE（2张，全部未摊分）</option><option value="GLLCJ26071302638THE">GLLCJ26071302638THE（2张，全部已摊分，上架状态不一致）</option><option value="GLLCJ26071302655THE">GLLCJ26071302655THE（2张，摊分状态不一致，演示不阻断）</option></select></div>
+        <div class="field" style="max-width:620px"><label for="groupSearch">物流商单号</label><div class="group-query"><input id="groupSearch" placeholder="请输入完整物流商单号"><button class="btn primary" id="queryGroup" type="button">查询</button></div></div>
         <div class="section-title"><h3>关联入库单</h3><span class="hint" id="groupStateHint"></span></div>
         <div class="table-wrap"><table><thead><tr><th>入库单号</th><th>收货仓库</th><th>入库状态</th><th>摊分状态</th><th>商品SKU数</th></tr></thead><tbody id="groupPreviewRows"></tbody></table></div>
       </div>
-      <div class="dialog-footer"><button class="btn close-modal" type="button">取消</button><button class="btn primary" id="continueSpecialFee" type="button">下一步</button></div>
+      <div class="dialog-footer"><button class="btn close-modal" type="button">取消</button><button class="btn primary" id="continueSpecialFee" type="button" disabled>下一步</button></div>
     </div>
   </div>
 
@@ -436,8 +437,8 @@
 
   <div class="modal" id="stageErrorModal">
     <div class="dialog small">
-      <div class="dialog-header"><h2>暂不允许操作</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
-      <div class="dialog-body"><div class="notice danger">同一物流商单下存在未摊分和已摊分入库单。请先统一摊分状态后再操作特殊费用。</div><div class="table-wrap"><table style="min-width:0"><thead><tr><th>入库单号</th><th>摊分状态</th></tr></thead><tbody id="stageErrorRows"></tbody></table></div></div>
+      <div class="dialog-header"><h2>无法执行特殊费用摊分</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
+      <div class="dialog-body"><div class="notice danger">该物流商单下存在未摊分入库单。全部关联入库单均已摊分后，才可执行特殊费用摊分。</div><div class="table-wrap"><table style="min-width:0"><thead><tr><th>入库单号</th><th>摊分状态</th></tr></thead><tbody id="stageErrorRows"></tbody></table></div></div>
       <div class="dialog-footer"><button class="btn close-modal" type="button">关闭</button></div>
     </div>
   </div>
@@ -520,10 +521,10 @@
 
       const confirmations = [
         ['特殊费用按物流商单号统一处理', '一次加载其下全部有效入库单，不支持仅选择其中一张入库单。'],
-        ['不校验关联入库单摊分状态（feeStatus）', '已上架走重新摊分路径（更新 package 成本 + 修正库存成本）；未上架只更新 package 成本；无需整单阻断。'],
+        ['校验关联入库单摊分状态（feeStatus）', '全部关联入库单必须为已摊分，任一未摊分则整单阻断并报错。'],
         ['每笔费用独立选择摊分方式和商品SKU', '支持按数量或按体积；同一商品SKU跨多入库单出现时只选择一次。'],
         ['分母包含所有关联入库单的选中SKU明细', '数量、体积、精度和舍入沿用现有摊分；缺少体积时整笔阻断。'],
-        ['允许关联入库单上架状态不一致', '未上架只更新入库SKU成本；已上架同时修正当前库存平均成本。'],
+        ['允许关联入库单上架状态不一致', '已上架SKU校验当前库存数量；未上架SKU无需校验。'],
         ['已上架SKU按注册SKU汇总校验当前库存', '任一库存不足整笔失败；负数冲减后入库成本不得小于0。'],
         ['保存后直接生效并保留完整记录', '复用现有权限；记录主维度为物流商单号，明细保留入库单号和SKU，已执行记录不可改删。'],
         ['重新摊分保留特殊费用', '只重算原四类费用；本次不追溯历史出库成本、不重算利润、不增加导出字段。']
@@ -538,6 +539,7 @@
       let filteredOrders = orders.slice();
       let skuSearchTerms = [];
       let skuDraftSelection = new Set();
+      let selectedGroupExpressNo = '';
 
       function money(value) { return Number(value || 0).toLocaleString('zh-CN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
       function escapeHtml(value) {
@@ -555,9 +557,7 @@
       function orderById(id) { return orders.find(function (item) { return item.id === Number(id); }); }
       function groupOrders(expressNo) { return orders.filter(function (item) { return item.expressNo === expressNo; }); }
       function groupMode(expressNo) {
-        const statuses = Array.from(new Set(groupOrders(expressNo).map(function (item) { return item.feeStatus; })));
-        if (statuses.length !== 1) return 'supplement';
-        return statuses[0] === '未摊分' ? 'initial' : 'supplement';
+        return groupOrders(expressNo).some(function (item) { return item.feeStatus !== '已摊分'; }) ? 'blocked' : 'supplement';
       }
       function groupSkuRows(expressNo) {
         const rows = [];
@@ -689,20 +689,41 @@
         ].map(function (item) { return '<div class="summary-cell"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>'; }).join('');
       }
 
-      function newFeeRow() { return { name: '', amount: '', method: '按数量', selected: [] }; }
+      function newFeeRow() { return { name: '', amount: '', method: '按体积', selected: [] }; }
 
       function renderGroupPreview() {
-        const expressNo = document.getElementById('groupSelect').value;
+        const expressNo = document.getElementById('groupSearch').value.trim();
+        const hint = document.getElementById('groupStateHint');
+        const rows = document.getElementById('groupPreviewRows');
+        const continueButton = document.getElementById('continueSpecialFee');
+        selectedGroupExpressNo = '';
+        continueButton.disabled = true;
+        if (!expressNo) {
+          hint.textContent = '请输入单个完整物流商单号进行精确查询';
+          hint.style.color = '#7b7f87';
+          rows.innerHTML = '<tr><td colspan="5"><div class="empty">请输入物流商单号后查询</div></td></tr>';
+          return;
+        }
         const mode = groupMode(expressNo);
         const group = groupOrders(expressNo);
-        const stateText = mode === 'initial' ? '全部未摊分，可执行首次摊分' : '可执行特殊费用摊分/补摊';
-        document.getElementById('groupStateHint').textContent = stateText;
-        document.getElementById('groupStateHint').style.color = '#1f8f5f';
-        document.getElementById('groupPreviewRows').innerHTML = group.map(function (order) {
+        if (!group.length) {
+          hint.textContent = '未查询到该物流商单号对应的有效入库单';
+          hint.style.color = '#f56c6c';
+          rows.innerHTML = '<tr><td colspan="5"><div class="empty">未查询到有效关联入库单</div></td></tr>';
+          return;
+        }
+        selectedGroupExpressNo = expressNo;
+        continueButton.disabled = false;
+        const blocked = mode === 'blocked';
+        const stateText = blocked ? '存在未摊分入库单，不允许执行特殊费用摊分' : '全部已摊分，可执行特殊费用摊分';
+        hint.textContent = stateText;
+        hint.style.color = blocked ? '#f56c6c' : '#1f8f5f';
+        rows.innerHTML = group.map(function (order) {
           return '<tr><td>' + order.orderNo + '</td><td>' + order.warehouse + '</td><td>' + order.status + '</td><td>' + order.feeStatus + '</td><td>' + order.skuCount + '</td></tr>';
         }).join('');
       }
       function openGroupSelector() {
+        document.getElementById('groupSearch').value = '';
         renderGroupPreview();
         modal('groupModal', true);
       }
@@ -724,9 +745,7 @@
         document.getElementById('feeGroupOrderRows').innerHTML = group.map(function (order) {
           return '<tr><td>' + order.orderNo + '</td><td>' + order.status + '</td><td>' + order.feeStatus + '</td><td>' + order.skuCount + '</td></tr>';
         }).join('');
-        const shelvedCount = group.filter(function (order) { return order.status === '已上架'; }).length;
-        document.getElementById('feeNotice').innerHTML = '<strong>特殊费用摊分/补摊：</strong>按选中商品SKU摊分特殊费用，更新各关联入库单 package 成本。'
-          + (shelvedCount ? ' 其中' + shelvedCount + '张已上架入库单需校验当前库存并修正库存平均成本；未上架入库单只更新入库SKU成本。' : ' 关联入库单均未上架，只更新入库SKU成本。');
+        document.getElementById('feeNotice').innerHTML = '仅对选中的商品SKU摊分特殊费用；如已上架商品库存不足，本次摊分不可执行。';
         renderFeeRows();
         modal('feeModal', true);
       }
@@ -959,9 +978,28 @@
       });
       document.getElementById('openRecords').addEventListener('click', function () { openRecords(currentOrder.expressNo); });
       document.getElementById('openSpecialFee').addEventListener('click', openGroupSelector);
-      document.getElementById('groupSelect').addEventListener('change', renderGroupPreview);
+      document.getElementById('queryGroup').addEventListener('click', renderGroupPreview);
+      document.getElementById('groupSearch').addEventListener('keydown', function (event) {
+        if (event.key === 'Enter') { event.preventDefault(); renderGroupPreview(); }
+      });
+      document.getElementById('groupSearch').addEventListener('input', function () {
+        if (this.value.trim() === selectedGroupExpressNo) return;
+        selectedGroupExpressNo = '';
+        document.getElementById('continueSpecialFee').disabled = true;
+        document.getElementById('groupStateHint').textContent = '请点击查询获取关联入库单';
+        document.getElementById('groupStateHint').style.color = '#7b7f87';
+        document.getElementById('groupPreviewRows').innerHTML = '<tr><td colspan="5"><div class="empty">等待查询</div></td></tr>';
+      });
       document.getElementById('continueSpecialFee').addEventListener('click', function () {
-        const expressNo = document.getElementById('groupSelect').value;
+        const expressNo = selectedGroupExpressNo;
+        if (!expressNo) { showToast('请先精确查询物流商单号'); return; }
+        if (groupMode(expressNo) === 'blocked') {
+          document.getElementById('stageErrorRows').innerHTML = groupOrders(expressNo).map(function (order) {
+            return '<tr><td>' + order.orderNo + '</td><td>' + order.feeStatus + '</td></tr>';
+          }).join('');
+          modal('stageErrorModal', true);
+          return;
+        }
         modal('groupModal', false);
         openFee(expressNo);
       });
