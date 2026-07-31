@@ -148,6 +148,7 @@
     .dialog-footer { min-height: 48px; display: flex; align-items: center; justify-content: flex-end; gap: 8px; padding: 0 16px; border-top: 1px solid var(--line); }
     .dialog-footer .btn { min-height: 24px; padding: 2px 12px; }
     .summary-strip { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 1px; margin-bottom: 14px; border: 1px solid var(--border); background: var(--border); }
+    #feeGroupSummary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .summary-cell { min-height: 58px; padding: 8px 10px; background: #fff; }
     .summary-cell span { display: block; color: var(--muted); font-size: 12px; }
     .summary-cell strong { display: block; margin-top: 3px; font-size: 14px; }
@@ -736,9 +737,7 @@
         document.getElementById('baseFeeSection').style.display = 'none';
         document.getElementById('feeGroupSummary').innerHTML = [
           ['物流商单号', expressNo],
-          ['关联入库单', group.length + '张'],
-          ['收货仓库', Array.from(new Set(group.map(function (item) { return item.warehouse; }))).join('、')],
-          ['本次处理', '特殊费用摊分/补摊']
+          ['关联入库单', group.length + '张']
         ].map(function (item) {
           return '<div class="summary-cell"><span>' + item[0] + '</span><strong>' + item[1] + '</strong></div>';
         }).join('');
