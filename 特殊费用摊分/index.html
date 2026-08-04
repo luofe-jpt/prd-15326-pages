@@ -391,7 +391,7 @@
         <div class="notice">合并展示物流商单下全部入库单商品。同一商品SKU跨入库单出现时选择一次，按全部关联明细参与计算。</div>
         <div class="sku-filter-row"><label for="skuSearch">商品SKU</label><input id="skuSearch" placeholder="多个精确SKU，使用逗号或空格分隔"><button class="btn teal" id="searchSkus" type="button">查询</button><button class="btn" id="resetSkuSearch" type="button">重置</button></div>
         <div class="sku-filter-result" id="skuSearchResult">展示全部商品SKU</div>
-        <div class="table-wrap"><table><thead><tr><th style="width:48px"><input type="checkbox" id="selectAllSkus"></th><th>入库单号</th><th>商品SKU</th><th>商品名称</th><th>注册SKU</th><th>发货数量</th><th>总体积(cm³)</th><th>当前库存</th></tr></thead><tbody id="skuRows"></tbody></table></div>
+        <div class="table-wrap"><table><thead><tr><th style="width:48px"><input type="checkbox" id="selectAllSkus"></th><th>入库单号</th><th>商品SKU</th><th>商品名称</th><th>注册SKU</th><th>发货数量</th><th>已上架数量</th><th>总体积(cm³)</th><th>当前库存</th></tr></thead><tbody id="skuRows"></tbody></table></div>
       </div>
       <div class="dialog-footer"><button class="btn close-modal" type="button">取消</button><button class="btn primary" id="confirmSkuSelection" type="button">确定选择</button></div>
     </div>
@@ -431,7 +431,7 @@
   <div class="modal" id="errorModal">
     <div class="dialog small">
       <div class="dialog-header"><h2>特殊费用摊分失败</h2><button class="btn icon close-modal" type="button" title="关闭">×</button></div>
-      <div class="dialog-body"><div class="notice danger">以下已上架注册SKU当前库存小于需校验数量。任一SKU库存不足时，本次全部特殊费用、入库成本及库存成本均不更新。</div><div class="table-wrap"><table style="min-width:0"><thead><tr><th>注册SKU</th><th>关联已上架入库单</th><th>需校验数量</th><th>当前库存</th></tr></thead><tbody id="errorRows"></tbody></table></div></div>
+      <div class="dialog-body"><div class="notice danger">以下注册SKU当前库存小于已上架数量。任一SKU库存不足时，本次全部特殊费用、入库成本及库存成本均不更新。</div><div class="table-wrap"><table style="min-width:0"><thead><tr><th>注册SKU</th><th>关联已上架入库单</th><th>需校验数量（已上架数量）</th><th>当前库存</th></tr></thead><tbody id="errorRows"></tbody></table></div></div>
       <div class="dialog-footer"><button class="btn close-modal" type="button">关闭</button></div>
     </div>
   </div>
@@ -483,28 +483,28 @@
 
       const skuCatalog = {
         1: [
-          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 20, volume: 880000, stock: 156, baseCost: 118.6 },
-          { sku: 'B2036', name: '厨房置物架', registerSku: 'US-B2036-SL', quantity: 24, volume: 1296000, stock: 88, baseCost: 96.4 }
+          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 20, shelvedQuantity: 0, volume: 880000, stock: 156, baseCost: 118.6 },
+          { sku: 'B2036', name: '厨房置物架', registerSku: 'US-B2036-SL', quantity: 24, shelvedQuantity: 0, volume: 1296000, stock: 88, baseCost: 96.4 }
         ],
         2: [
-          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 20, volume: 880000, stock: 156, baseCost: 118.6 },
-          { sku: 'C3098', name: '户外折叠椅', registerSku: 'US-C3098-GR', quantity: 16, volume: 1920000, stock: 61, baseCost: 132.8 }
+          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 20, shelvedQuantity: 0, volume: 880000, stock: 156, baseCost: 118.6 },
+          { sku: 'C3098', name: '户外折叠椅', registerSku: 'US-C3098-GR', quantity: 16, shelvedQuantity: 0, volume: 1920000, stock: 61, baseCost: 132.8 }
         ],
         3: [
-          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 40, volume: 1760000, stock: 156, baseCost: 118.6 },
-          { sku: 'G7015', name: '宠物围栏', registerSku: 'US-G7015-BK', quantity: 36, volume: 2268000, stock: 18, baseCost: 145.2 }
+          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 40, shelvedQuantity: 40, volume: 1760000, stock: 156, baseCost: 118.6 },
+          { sku: 'G7015', name: '宠物围栏', registerSku: 'US-G7015-BK', quantity: 36, shelvedQuantity: 36, volume: 2268000, stock: 18, baseCost: 145.2 }
         ],
         4: [
-          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 20, volume: 880000, stock: 156, baseCost: 118.6 },
-          { sku: 'H8020', name: '露营灯支架', registerSku: 'US-H8020-BK', quantity: 20, volume: 440000, stock: 33, baseCost: 57.6 }
+          { sku: 'A1001', name: '折叠收纳箱 45L', registerSku: 'US-A1001-BL', quantity: 20, shelvedQuantity: 0, volume: 880000, stock: 156, baseCost: 118.6 },
+          { sku: 'H8020', name: '露营灯支架', registerSku: 'US-H8020-BK', quantity: 20, shelvedQuantity: 0, volume: 440000, stock: 33, baseCost: 57.6 }
         ],
         5: [
-          { sku: 'D4012', name: '浴室防滑垫', registerSku: 'UK-D4012-GY', quantity: 35, volume: 630000, stock: 72, baseCost: 42.5 },
-          { sku: 'F6088', name: '可折叠洗衣篮', registerSku: 'UK-F6088-WH', quantity: 20, volume: 820000, stock: 49, baseCost: 71.3 }
+          { sku: 'D4012', name: '浴室防滑垫', registerSku: 'UK-D4012-GY', quantity: 35, shelvedQuantity: 0, volume: 630000, stock: 72, baseCost: 42.5 },
+          { sku: 'F6088', name: '可折叠洗衣篮', registerSku: 'UK-F6088-WH', quantity: 20, shelvedQuantity: 0, volume: 820000, stock: 49, baseCost: 71.3 }
         ],
         6: [
-          { sku: 'E5024', name: '真空压缩袋套装', registerSku: 'UK-E5024-TR', quantity: 50, volume: 375000, stock: 132, baseCost: 28.2 },
-          { sku: 'K1002', name: '可叠放鞋盒', registerSku: 'UK-K1002-TR', quantity: 30, volume: 540000, stock: 86, baseCost: 35.6 }
+          { sku: 'E5024', name: '真空压缩袋套装', registerSku: 'UK-E5024-TR', quantity: 50, shelvedQuantity: 50, volume: 375000, stock: 132, baseCost: 28.2 },
+          { sku: 'K1002', name: '可叠放鞋盒', registerSku: 'UK-K1002-TR', quantity: 30, shelvedQuantity: 30, volume: 540000, stock: 86, baseCost: 35.6 }
         ]
       };
 
@@ -579,6 +579,7 @@
               registerSkus: [],
               orderNos: [],
               quantity: 0,
+              shelvedQuantity: 0,
               volume: 0,
               stock: row.stock,
               missingVolume: false
@@ -588,6 +589,7 @@
           if (!item.registerSkus.includes(row.registerSku)) item.registerSkus.push(row.registerSku);
           if (!item.orderNos.includes(row.orderNo)) item.orderNos.push(row.orderNo);
           item.quantity += row.quantity;
+          item.shelvedQuantity += Number(row.shelvedQuantity || 0);
           item.volume += Number(row.volume || 0);
           item.stock = Math.min(item.stock, row.stock);
           item.missingVolume = item.missingVolume || Number(row.volume || 0) <= 0;
@@ -600,13 +602,13 @@
       function skuHasInsufficientStock(skuCode) {
         const totals = {};
         groupSkuRows(currentExpressNo).filter(function (row) {
-          return row.orderStatus === '已上架' && row.sku === skuCode;
+          return Number(row.shelvedQuantity || 0) > 0 && row.sku === skuCode;
         }).forEach(function (row) {
-          if (!totals[row.registerSku]) totals[row.registerSku] = { quantity: 0, stock: row.stock };
-          totals[row.registerSku].quantity += row.quantity;
+          if (!totals[row.registerSku]) totals[row.registerSku] = { shelvedQuantity: 0, stock: row.stock };
+          totals[row.registerSku].shelvedQuantity += Number(row.shelvedQuantity || 0);
           totals[row.registerSku].stock = Math.min(totals[row.registerSku].stock, row.stock);
         });
-        return Object.values(totals).some(function (item) { return item.stock < item.quantity; });
+        return Object.values(totals).some(function (item) { return item.stock < item.shelvedQuantity; });
       }
       function renderSkuOptions() {
         const allSkus = groupSkus(currentExpressNo);
@@ -616,8 +618,8 @@
           : allSkus;
         document.getElementById('skuRows').innerHTML = visibleSkus.map(function (sku) {
           const insufficient = skuHasInsufficientStock(sku.sku);
-          return '<tr' + (insufficient ? ' class="sku-row-warning"' : '') + '><td><input type="checkbox" class="sku-check" value="' + sku.sku + '"' + (skuDraftSelection.has(sku.sku) ? ' checked' : '') + '></td><td>' + sku.orderNos.join('<br>') + '</td><td>' + sku.sku + '</td><td>' + sku.name + '</td><td>' + sku.registerSkus.join('、') + '</td><td>' + sku.quantity + '</td><td>' + sku.volume.toLocaleString('zh-CN') + '</td><td' + (insufficient ? ' class="stock-shortage"' : '') + '>' + sku.stock + (insufficient ? '（不足）' : '') + '</td></tr>';
-        }).join('') || '<tr><td colspan="8"><div class="empty">未匹配到商品SKU</div></td></tr>';
+          return '<tr' + (insufficient ? ' class="sku-row-warning"' : '') + '><td><input type="checkbox" class="sku-check" value="' + sku.sku + '"' + (skuDraftSelection.has(sku.sku) ? ' checked' : '') + '></td><td>' + sku.orderNos.join('<br>') + '</td><td>' + sku.sku + '</td><td>' + sku.name + '</td><td>' + sku.registerSkus.join('、') + '</td><td>' + sku.quantity + '</td><td>' + sku.shelvedQuantity + '</td><td>' + sku.volume.toLocaleString('zh-CN') + '</td><td' + (insufficient ? ' class="stock-shortage"' : '') + '>' + sku.stock + (insufficient ? '（不足）' : '') + '</td></tr>';
+        }).join('') || '<tr><td colspan="9"><div class="empty">未匹配到商品SKU</div></td></tr>';
         const unmatched = skuSearchTerms.filter(function (sku) { return !allCodes.has(sku); });
         document.getElementById('skuSearchResult').textContent = skuSearchTerms.length
           ? '精确匹配' + visibleSkus.length + '个商品SKU' + (unmatched.length ? '；未匹配：' + unmatched.join('、') : '')
@@ -805,14 +807,14 @@
         feeRows.forEach(function (row) { row.selected.forEach(function (sku) { selectedSet.add(sku); }); });
         const registerSkuTotals = {};
         groupSkuRows(currentExpressNo).filter(function (sku) {
-          return sku.orderStatus === '已上架' && selectedSet.has(sku.sku);
+          return Number(sku.shelvedQuantity || 0) > 0 && selectedSet.has(sku.sku);
         }).forEach(function (sku) {
-          if (!registerSkuTotals[sku.registerSku]) registerSkuTotals[sku.registerSku] = { registerSku: sku.registerSku, quantity: 0, stock: sku.stock, orderNos: [] };
-          registerSkuTotals[sku.registerSku].quantity += sku.quantity;
+          if (!registerSkuTotals[sku.registerSku]) registerSkuTotals[sku.registerSku] = { registerSku: sku.registerSku, shelvedQuantity: 0, stock: sku.stock, orderNos: [] };
+          registerSkuTotals[sku.registerSku].shelvedQuantity += Number(sku.shelvedQuantity || 0);
           registerSkuTotals[sku.registerSku].stock = Math.min(registerSkuTotals[sku.registerSku].stock, sku.stock);
           if (!registerSkuTotals[sku.registerSku].orderNos.includes(sku.orderNo)) registerSkuTotals[sku.registerSku].orderNos.push(sku.orderNo);
         });
-        return Object.values(registerSkuTotals).filter(function (sku) { return sku.stock < sku.quantity; });
+        return Object.values(registerSkuTotals).filter(function (sku) { return sku.stock < sku.shelvedQuantity; });
       }
 
       function openDetail(order) {
@@ -952,7 +954,7 @@
         if (error) { showToast(error); return; }
         const insufficient = insufficientStock();
         if (insufficient.length) {
-          document.getElementById('errorRows').innerHTML = insufficient.map(function (sku) { return '<tr><td>' + sku.registerSku + '</td><td>' + sku.orderNos.join('、') + '</td><td>' + sku.quantity + '</td><td>' + sku.stock + '</td></tr>'; }).join('');
+          document.getElementById('errorRows').innerHTML = insufficient.map(function (sku) { return '<tr><td>' + sku.registerSku + '</td><td>' + sku.orderNos.join('、') + '</td><td>' + sku.shelvedQuantity + '</td><td>' + sku.stock + '</td></tr>'; }).join('');
           modal('errorModal', true);
           return;
         }
