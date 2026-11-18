@@ -1,0 +1,884 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Shopee FBS 货件导入报错分析</title>
+<style>
+  :root{
+    --bg:#f5f7fa; --card:#fff; --ink:#1f2937; --muted:#6b7280; --line:#e5e7eb;
+    --blue:#2563eb; --blue-soft:#eff6ff; --red:#dc2626; --red-soft:#fef2f2;
+    --green:#059669; --green-soft:#ecfdf5; --amber:#d97706; --amber-soft:#fffbeb;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.65 -apple-system,"Segoe UI","Microsoft YaHei","PingFang SC",sans-serif}
+  .wrap{max-width:1100px;margin:0 auto;padding:24px 16px 64px}
+  header.top{display:flex;align-items:center;gap:12px;margin-bottom:18px}
+  header.top .logo{width:38px;height:38px;border-radius:10px;background:linear-gradient(135deg,#2563eb,#7c3aed);color:#fff;display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700}
+  header.top h1{font-size:19px;margin:0}
+  header.top .sub{color:var(--muted);font-size:12.5px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 18px 16px;margin-bottom:16px;box-shadow:0 1px 2px rgba(16,24,40,.04)}
+  .card h2{font-size:15px;margin:0 0 12px;display:flex;align-items:center;gap:8px}
+  .card h2 .step{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:6px;background:var(--blue);color:#fff;font-size:12px}
+  .hint{color:var(--muted);font-size:12.5px}
+  .drop{border:1.6px dashed #c3cfe3;border-radius:10px;padding:26px 16px;text-align:center;color:var(--muted);cursor:pointer;transition:.15s;background:#fbfdff}
+  .drop.on{border-color:var(--blue);background:var(--blue-soft);color:var(--blue)}
+  .drop b{color:var(--ink)}
+  .filetag{display:inline-flex;align-items:center;gap:8px;margin-top:10px;background:var(--green-soft);color:var(--green);border:1px solid #a7f3d0;border-radius:8px;padding:5px 12px;font-size:13px}
+  textarea{width:100%;min-height:120px;border:1px solid var(--line);border-radius:10px;padding:10px 12px;font:12.5px/1.6 Consolas,Menlo,monospace;resize:vertical;color:var(--ink)}
+  textarea:focus{outline:2px solid #bfdbfe;border-color:var(--blue)}
+  .btn{display:inline-flex;align-items:center;gap:6px;border:0;border-radius:9px;padding:9px 18px;font-size:14px;cursor:pointer;background:var(--blue);color:#fff;transition:.15s}
+  .btn:hover{filter:brightness(1.08)}
+  .btn.ghost{background:#fff;color:var(--ink);border:1px solid var(--line)}
+  .btn.sm{padding:5px 12px;font-size:12.5px;border-radius:7px}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  .msg{border-radius:9px;padding:9px 13px;font-size:13px;margin-top:10px;display:none}
+  .msg.err{display:block;background:var(--red-soft);color:var(--red);border:1px solid #fecaca}
+  .msg.ok{display:block;background:var(--green-soft);color:var(--green);border:1px solid #a7f3d0}
+  .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:6px}
+  .stat{background:#fff;border:1px solid var(--line);border-radius:10px;padding:11px 14px}
+  .stat .k{color:var(--muted);font-size:12px}
+  .stat .v{font-size:20px;font-weight:700;margin-top:2px}
+  .stat .v.red{color:var(--red)} .stat .v.green{color:var(--green)} .stat .v.amber{color:var(--amber)}
+  .kv{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px 18px}
+  .kv div{font-size:13px;padding:2px 0;border-bottom:1px dashed #eef1f5}
+  .kv b{color:var(--muted);font-weight:500;margin-right:6px}
+  .grp{border:1px solid var(--line);border-radius:10px;padding:12px 14px;margin-bottom:10px}
+  .grp .gt{font-weight:600;display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .badge{display:inline-block;border-radius:20px;padding:1px 10px;font-size:12px;font-weight:600}
+  .badge.red{background:var(--red-soft);color:var(--red)} .badge.amber{background:var(--amber-soft);color:var(--amber)}
+  .badge.blue{background:var(--blue-soft);color:var(--blue)} .badge.gray{background:#f3f4f6;color:var(--muted)}
+  .explain{font-size:13px;color:#374151;margin:8px 0 4px}
+  .advice{margin:6px 0 0;padding-left:20px}
+  .advice li{margin:3px 0;font-size:13px}
+  .tblwrap{overflow:auto;max-height:520px;border:1px solid var(--line);border-radius:10px}
+  table{border-collapse:collapse;width:100%;font-size:12.5px;background:#fff}
+  th{position:sticky;top:0;background:#f8fafc;text-align:left;padding:7px 10px;border-bottom:1px solid var(--line);white-space:nowrap;z-index:1}
+  td{padding:6px 10px;border-bottom:1px solid #f1f4f8;vertical-align:top}
+  tr:hover td{background:#f8faff}
+  td.wrap{max-width:260px;overflow-wrap:anywhere}
+  input.filter{width:240px;border:1px solid var(--line);border-radius:8px;padding:7px 11px;font-size:13px}
+  .reportbox{width:100%;min-height:180px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;padding:12px;font:12px/1.6 Consolas,Menlo,monospace;white-space:pre;overflow:auto}
+  details.help{margin-top:6px}
+  details.help summary{cursor:pointer;color:var(--blue);font-size:13px}
+  details.help .inner{color:var(--muted);font-size:13px;padding:8px 2px 2px}
+  .toast{position:fixed;left:50%;bottom:34px;transform:translateX(-50%) translateY(20px);background:#111827;color:#fff;border-radius:9px;padding:9px 18px;font-size:13px;opacity:0;pointer-events:none;transition:.25s;z-index:9}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+  footer{color:var(--muted);font-size:12px;text-align:center;margin-top:22px;line-height:1.8}
+  .hidden{display:none}
+  @media print{.noprint{display:none}body{background:#fff}.card{break-inside:avoid}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="logo">析</div>
+    <div>
+      <h1>Shopee FBS 货件导入报错分析</h1>
+      <div class="sub">上传导入报错的 FBS 文件 + 粘贴导入结果报错，自动定位失败 SKU、原因与处理建议（文件仅在浏览器本地解析，不会上传）</div>
+    </div>
+  </header>
+
+  <div class="card noprint">
+    <h2><span class="step">1</span>上传货件文件（Shopee 后台下载的 FBS .xlsx）</h2>
+    <div class="drop" id="drop">
+      拖拽文件到此处，或 <b>点击选择</b> .xlsx 文件
+      <div class="hint" style="margin-top:6px">支持：FBS 官方模板（Inbound Request + SKU Detail 两个 sheet）、通用导入模板</div>
+    </div>
+    <input type="file" id="file" accept=".xlsx" class="hidden">
+    <div id="filetag"></div>
+  </div>
+
+  <div class="card noprint">
+    <h2><span class="step">2</span>粘贴导入结果中的报错（可选，建议粘贴）</h2>
+    <textarea id="paste" placeholder="每行一条，从导入结果表格直接复制即可，例如：&#10;shopee-FBSINMY2026111600531-360-S42_odelia001.my&#9;匹配销售头程失败：发货仓库[义乌仓]未匹配到唯一头程，候选头程：马来-虾皮官方特货海运,马来-虾皮官方普货海运&#10;&#10;也可以只粘贴失败行；包含“导入成功”的行会自动忽略。"></textarea>
+    <div class="row">
+      <button class="btn" id="run">开始分析</button>
+      <button class="btn ghost" id="clear">清空</button>
+      <span class="hint" id="pasteCount"></span>
+    </div>
+    <details class="help">
+      <summary>报错从哪里复制？</summary>
+      <div class="inner">平台仓 → 货件计划 → 导入，导入完成后弹出的结果表格里，选中失败行（或全部行）复制，粘贴到上面的输入框。表格两列（货件号、原因）复制后每行一条，可直接使用。</div>
+    </details>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <div id="result" class="hidden">
+    <div class="card">
+      <h2><span class="step">3</span>文件概览</h2>
+      <div class="kv" id="overview"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">4</span>报错统计</h2>
+      <div class="stats" id="stats"></div>
+      <div id="grpStats"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">5</span>原因与处理建议</h2>
+      <div id="kb"></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">6</span>失败明细 <span class="hint">（可直接发给仓配/开发）</span></h2>
+      <div class="row" style="margin:0 0 10px">
+        <input class="filter noprint" id="filter" placeholder="筛选：SKU / 名称 / 货件号…">
+      </div>
+      <div class="tblwrap"><table id="detailTbl"><thead></thead><tbody></tbody></table></div>
+    </div>
+
+    <div class="card">
+      <h2><span class="step">7</span>分析报告</h2>
+      <div class="reportbox" id="report"></div>
+      <div class="row noprint">
+        <button class="btn" id="copy">复制报告（发钉钉 / 微信）</button>
+        <button class="btn ghost" id="download">下载报告 (.md)</button>
+      </div>
+    </div>
+  </div>
+
+  <footer>
+    工具仅做本地文件解析与规则匹配，不保存任何数据；报错原因知识库基于 trade-lms 导入匹配逻辑整理。<br>
+    处理建议仅供参考，渠道/头程配置请以海外仓头程页面实际配置为准。
+  </footer>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+/* ===== CORE-BEGIN ===== */
+'use strict';
+/* ---------- 原始 DEFLATE 解压（raw inflate, puff 风格） ---------- */
+function inflateRaw(input){
+  var pos=0, bitbuf=0, bitcnt=0;
+  var out=new Uint8Array(1<<16), outLen=0;
+  function bits(n){
+    while(bitcnt<n){
+      if(pos>=input.length) throw new Error('deflate: 输入意外结束');
+      bitbuf|=input[pos++]<<bitcnt; bitcnt+=8;
+    }
+    var v=bitbuf&((1<<n)-1); bitbuf>>>=n; bitcnt-=n; return v;
+  }
+  function grow(need){
+    if(outLen+need<=out.length) return;
+    var cap=out.length*2; while(cap<outLen+need) cap*=2;
+    var nb=new Uint8Array(cap); nb.set(out.subarray(0,outLen)); out=nb;
+  }
+  function buildHuffman(lengths){
+    var MAXBITS=15, count=new Array(MAXBITS+1).fill(0), i, len;
+    for(i=0;i<lengths.length;i++) count[lengths[i]]++;
+    if(count[0]===lengths.length) return null;
+    var left=1;
+    for(len=1;len<=MAXBITS;len++){ left<<=1; left-=count[len]; if(left<0) throw new Error('deflate: 超额霍夫曼编码'); }
+    var offs=new Array(MAXBITS+2).fill(0);
+    for(len=1;len<=MAXBITS;len++) offs[len+1]=offs[len]+count[len];
+    var symbol=new Array(lengths.length).fill(0);
+    for(i=0;i<lengths.length;i++) if(lengths[i]!==0) symbol[offs[lengths[i]]++]=i;
+    return {count:count, symbol:symbol};
+  }
+  function decode(h){
+    var code=0, first=0, index=0, len, count;
+    for(len=1;len<=15;len++){
+      code|=bits(1);
+      count=h.count[len];
+      if(code-first<count) return h.symbol[index+(code-first)];
+      index+=count; first+=count; first<<=1; code<<=1;
+    }
+    throw new Error('deflate: 无效编码');
+  }
+  var LBASE=[3,4,5,6,7,8,9,10,11,13,15,17,19,23,27,31,35,43,51,59,67,83,99,115,131,163,195,227,258];
+  var LEXT =[0,0,0,0,0,0,0,0,1,1,1,1,2,2,2,2,3,3,3,3,4,4,4,4,5,5,5,5,0];
+  var DBASE=[1,2,3,4,5,7,9,13,17,25,33,49,65,97,129,193,257,385,513,769,1025,1537,2049,3073,4097,6145,8193,12289,16385,24577];
+  var DEXT =[0,0,0,0,1,1,2,2,3,3,4,4,5,5,6,6,7,7,8,8,9,9,10,10,11,11,12,12,13,13];
+  var litHuff=null, distHuff=null;
+  function codes(tree){
+    var sym=decode(tree);
+    if(sym<=255){ grow(1); out[outLen++]=sym; return true; }
+    if(sym===256) return false;
+    if(sym>285) throw new Error('deflate: 无效长度码');
+    sym-=257;
+    var len=LBASE[sym]+(LEXT[sym]?bits(LEXT[sym]):0);
+    var dsym=decode(distHuff);
+    if(dsym>29) throw new Error('deflate: 无效距离码');
+    var dist=DBASE[dsym]+(DEXT[dsym]?bits(DEXT[dsym]):0);
+    if(outLen<dist) throw new Error('deflate: 无效回溯距离');
+    grow(len);
+    var from=outLen-dist, i;
+    for(i=0;i<len;i++) out[outLen++]=out[from++];
+    return true;
+  }
+  function stored(){
+    bitbuf=0; bitcnt=0;
+    if(pos+4>input.length) throw new Error('deflate: 存储块不完整');
+    var len=input[pos]|(input[pos+1]<<8), nlen=input[pos+2]|(input[pos+3]<<8);
+    if((len^0xFFFF)!==nlen) throw new Error('deflate: 存储块校验失败');
+    pos+=4;
+    if(pos+len>input.length) throw new Error('deflate: 存储块数据不足');
+    grow(len);
+    for(var i=0;i<len;i++) out[outLen++]=input[pos++];
+  }
+  function fixedTables(){
+    var ll=new Array(288), i;
+    for(i=0;i<144;i++) ll[i]=8;
+    for(i=144;i<256;i++) ll[i]=9;
+    for(i=256;i<280;i++) ll[i]=7;
+    for(i=280;i<288;i++) ll[i]=8;
+    litHuff=buildHuffman(ll);
+    distHuff=buildHuffman(new Array(30).fill(5));
+  }
+  function dynamicTables(){
+    var hlit=bits(5)+257, hdist=bits(5)+1, hclen=bits(4)+4;
+    var ORDER=[16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15];
+    var cl=new Array(19).fill(0), i;
+    for(i=0;i<hclen;i++) cl[ORDER[i]]=bits(3);
+    var clHuff=buildHuffman(cl);
+    if(!clHuff) throw new Error('deflate: 空码长表');
+    var lengths=new Array(hlit+hdist).fill(0), idx=0, sym, n;
+    while(idx<lengths.length){
+      sym=decode(clHuff);
+      if(sym<16) lengths[idx++]=sym;
+      else if(sym===16){
+        if(idx===0) throw new Error('deflate: 无前码可复制');
+        var prev=lengths[idx-1]; n=3+bits(2);
+        if(idx+n>lengths.length) throw new Error('deflate: 码长溢出');
+        while(n--) lengths[idx++]=prev;
+      } else if(sym===17){ n=3+bits(3); if(idx+n>lengths.length) throw new Error('deflate: 码长溢出'); while(n--) lengths[idx++]=0; }
+      else { n=11+bits(7); if(idx+n>lengths.length) throw new Error('deflate: 码长溢出'); while(n--) lengths[idx++]=0; }
+    }
+    if(lengths[256]===0) throw new Error('deflate: 缺少结束码');
+    litHuff=buildHuffman(lengths.slice(0,hlit));
+    distHuff=buildHuffman(lengths.slice(hlit));
+    if(!distHuff) distHuff=buildHuffman([1]);
+    if(!litHuff) throw new Error('deflate: 空字母表');
+  }
+  var finalBlk=false, type;
+  while(!finalBlk){
+    finalBlk=!!bits(1); type=bits(2);
+    if(type===0){ stored(); }
+    else if(type===1){ if(!litHuff) fixedTables(); var run=true; while(run) run=codes(litHuff); }
+    else if(type===2){ dynamicTables(); var run2=true; while(run2) run2=codes(litHuff); }
+    else throw new Error('deflate: 无效块类型');
+  }
+  return out.subarray(0,outLen);
+}
+
+/* ---------- ZIP 解包 ---------- */
+function unzip(buf){
+  var u8=buf instanceof Uint8Array?buf:new Uint8Array(buf);
+  var dv=new DataView(u8.buffer,u8.byteOffset,u8.byteLength);
+  var eocd=-1, i, min=Math.max(0,u8.length-66000);
+  for(i=u8.length-22;i>=min;i--){
+    if(u8[i]===0x50&&u8[i+1]===0x4b&&u8[i+2]===0x05&&u8[i+3]===0x06){ eocd=i; break; }
+  }
+  if(eocd<0) throw new Error('无法解析：这不是有效的 .xlsx 文件（请确认是 Shopee 后台下载的 .xlsx，而不是 .xls）');
+  var total=dv.getUint16(eocd+10,true);
+  var cdOff=dv.getUint32(eocd+16,true);
+  var dec=new TextDecoder('utf-8');
+  var entries=new Map(), p=cdOff, n, name, method, compSize, nameLen, extraLen, commentLen, lho, lnl, lel, ds, comp;
+  for(n=0;n<total;n++){
+    if(dv.getUint32(p,true)!==0x02014b50) throw new Error('zip: 中央目录损坏');
+    method=dv.getUint16(p+10,true);
+    compSize=dv.getUint32(p+20,true);
+    nameLen=dv.getUint16(p+28,true);
+    extraLen=dv.getUint16(p+30,true);
+    commentLen=dv.getUint16(p+32,true);
+    lho=dv.getUint32(p+42,true);
+    name=dec.decode(u8.subarray(p+46,p+46+nameLen));
+    if(dv.getUint32(lho,true)!==0x04034b50) throw new Error('zip: 本地文件头损坏');
+    lnl=dv.getUint16(lho+26,true); lel=dv.getUint16(lho+28,true);
+    ds=lho+30+lnl+lel;
+    comp=u8.subarray(ds,ds+compSize);
+    if(method===0) entries.set(name,comp);
+    else if(method===8) entries.set(name,inflateRaw(comp));
+    else throw new Error('zip: 不支持的压缩方式 '+method);
+    p+=46+nameLen+extraLen+commentLen;
+  }
+  return entries;
+}
+
+/* ---------- XML 工具 ---------- */
+function xmlDecode(s){
+  if(s.indexOf('&')<0) return s;
+  return s.replace(/&(#x?[0-9a-fA-F]+|[a-zA-Z][a-zA-Z0-9]*);/g,function(m,g){
+    if(g.charAt(0)==='#'){
+      var code=g.charAt(1)==='x'||g.charAt(1)==='X'?parseInt(g.slice(2),16):parseInt(g.slice(1),10);
+      try{ return String.fromCodePoint(code); }catch(e){ return m; }
+    }
+    switch(g){
+      case 'lt':return '<'; case 'gt':return '>'; case 'quot':return '"';
+      case 'apos':return "'"; case 'amp':return '&'; case 'nbsp':return '\u00a0';
+      default:return m;
+    }
+  });
+}
+function parseSharedStrings(xml){
+  var arr=[], siRe=/<si(?:\s[^>]*)?>([\s\S]*?)<\/si>/g, m, tRe, t, text;
+  while((m=siRe.exec(xml))!==null){
+    text=''; tRe=/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>|<t(?:\s[^>]*)?\/>/g;
+    while((t=tRe.exec(m[1]))!==null) text+=(t[1]===undefined?'':xmlDecode(t[1]));
+    arr.push(text);
+  }
+  return arr;
+}
+function colToIdx(ref){
+  var n=0, i, c;
+  for(i=0;i<ref.length;i++){
+    c=ref.charCodeAt(i);
+    if(c>=65&&c<=90) n=n*26+(c-64);
+    else if(c>=97&&c<=122) n=n*26+(c-96);
+    else break;
+  }
+  return n-1;
+}
+function parseSheet(xml, shared){
+  var rows=[], rowRe=/<row(?:\s[^>]*)?>([\s\S]*?)<\/row>|<row(?:\s[^>]*)?\/>/g, rm, rowNumM, rowNum, cells;
+  while((rm=rowRe.exec(xml))!==null){
+    rowNumM=rm[0].match(/\br="(\d+)"/);
+    rowNum=rowNumM?parseInt(rowNumM[1],10):rows.length+1;
+    cells=[];
+    if(rm[1]!==undefined){
+      var cRe=/<c(?:\s[^>]*)?(?:\/>|>([\s\S]*?)<\/c>)/g, cm, cFull, rM, colIdx, seqIdx=0, tM, type, val, vM, raw;
+      while((cm=cRe.exec(rm[1]))!==null){
+        cFull=cm[0];
+        rM=cFull.match(/\br="([A-Za-z]+)\d+"/);
+        colIdx=rM?colToIdx(rM[1]):seqIdx;
+        seqIdx=colIdx+1;
+        tM=cFull.match(/\bt="([^"]+)"/);
+        type=tM?tM[1]:'n';
+        val='';
+        if(cm[1]!==undefined){
+          if(type==='inlineStr'){
+            var isM=cm[1].match(/<is(?:\s[^>]*)?>([\s\S]*?)<\/is>/);
+            if(isM){
+              var tRe2=/<t(?:\s[^>]*)?>([\s\S]*?)<\/t>/g, t2, s2='';
+              while((t2=tRe2.exec(isM[1]))!==null) s2+=xmlDecode(t2[1]);
+              val=s2;
+            }
+          } else {
+            vM=cm[1].match(/<v(?:\s[^>]*)?>([\s\S]*?)<\/v>/);
+            if(vM){
+              raw=xmlDecode(vM[1]);
+              if(type==='s'){ var si=parseInt(raw,10); val=(shared&&shared[si]!==undefined)?shared[si]:''; }
+              else if(type==='b') val=(raw==='1')?'TRUE':'FALSE';
+              else val=raw;
+            }
+          }
+        }
+        cells[colIdx]=val;
+      }
+    }
+    rows[rowNum-1]=cells;
+  }
+  return rows;
+}
+function readWorkbook(buf){
+  var entries=unzip(buf);
+  var dec=new TextDecoder('utf-8');
+  function get(n){ var e=entries.get(n); return e?dec.decode(e):null; }
+  var wbXml=get('xl/workbook.xml');
+  if(!wbXml) throw new Error('xlsx: 缺少 workbook.xml（不是有效的 .xlsx）');
+  var relsXml=get('xl/_rels/workbook.xml.rels')||'';
+  var relMap={}, relRe=/<Relationship\b[^>]*>/g, rm;
+  while((rm=relRe.exec(relsXml))!==null){
+    var idM=rm[0].match(/\bId="([^"]+)"/), tgM=rm[0].match(/\bTarget="([^"]+)"/);
+    if(idM&&tgM) relMap[idM[1]]=tgM[1];
+  }
+  var sharedXml=get('xl/sharedStrings.xml');
+  var shared=sharedXml?parseSharedStrings(sharedXml):[];
+  var sheets=[], sheetRe=/<sheet\b[^>]*?\/?>/g, nameM, ridM, target, path, xml;
+  while((rm=sheetRe.exec(wbXml))!==null){
+    nameM=rm[0].match(/\bname="([^"]+)"/);
+    ridM=rm[0].match(/\br:id="([^"]+)"/);
+    target=ridM?relMap[ridM[1]]:null; xml=null;
+    if(target){
+      path=target.replace(/^\//,'');
+      if(path.indexOf('xl/')!==0) path='xl/'+path;
+      xml=get(path);
+    }
+    if(!xml) xml=get('xl/worksheets/sheet'+(sheets.length+1)+'.xml');
+    sheets.push({name:nameM?xmlDecode(nameM[1]):('Sheet'+(sheets.length+1)), rows:xml?parseSheet(xml,shared):[]});
+  }
+  return sheets;
+}
+
+/* ---------- 模板识别与解析 ---------- */
+function norm(h){ return String(h==null?'':h).toLowerCase().replace(/\s+/g,''); }
+function headMap(headerRow, keys){
+  var m={}, i, h;
+  for(i=0;i<headerRow.length;i++){
+    h=norm(headerRow[i]);
+    for(var k in keys){ if(keys[k].indexOf(h)>=0 && m[k]===undefined) m[k]=i; }
+  }
+  return m;
+}
+var FBS_MAIN_KEYS={requestId:['requestid','申请编号'],inboundId:['inboundid','入库编号'],warehouse:['inboundwarehouse','入库仓库'],shippedBy:['shippedby'],shippingMethod:['shippingmethod'],shopNames:['shopid/name'],status:['status','状态'],sbsVendor:['sbsvendorid/name']};
+var FBS_DET_KEYS={requestId:['requestid','申请编号'],shopSku:['shopskuid','店铺skuid'],warehouseSku:['warehouseskuid','仓库skuid'],external:['externalskuid','外部skuid'],name:['skuname','sku名称'],variation:['variation','规格'],barcode:['barcode','条码'],approvedQty:['approvedqty','已批准数量'],requestQty:['requestinboundqty','请求入库数量'],status:['status','状态']};
+var COMMON_KEYS={plat:['平台'],platOrderId:['货件编号'],storeAcct:['店铺名称'],sellerSku:['店铺sku'],prodSku:['商品sku'],planQty:['计划数量'],title:['平台商品标题'],spec:['平台商品规格'],salesHeadChannel:['销售头程渠道']};
+
+function parseSites(shopSku){
+  var s=new Set(), re=/\(([A-Z]{2})\)/g, m;
+  while((m=re.exec(String(shopSku||'')))!==null) s.add(m[1]);
+  return Array.from(s);
+}
+
+function parseFbsFile(sheets){
+  var main=null, detail=null, i, head;
+  for(i=0;i<sheets.length;i++){
+    head=(sheets[i].rows[0]||[]).map(norm);
+    if(!main && head.indexOf('requestid')>=0 && head.indexOf('shippedby')>=0) main=sheets[i];
+    else if(head.indexOf('externalskuid')>=0 || head.indexOf('warehouseskuid')>=0) detail=sheets[i];
+  }
+  if(!main && !detail) return null;
+  var mainInfo={};
+  if(main){
+    var mh=headMap(main.rows[0]||[], FBS_MAIN_KEYS), dataRow=null, r;
+    for(r=1;r<main.rows.length;r++){ if((main.rows[r]||[]).some(function(c){return String(c||'').trim()!=='';})){ dataRow=main.rows[r]; break; } }
+    if(dataRow){
+      mainInfo.requestId=(mh.requestId!==undefined?dataRow[mh.requestId]:'')||'';
+      mainInfo.inboundId=(mh.inboundId!==undefined?dataRow[mh.inboundId]:'')||'';
+      mainInfo.warehouse=(mh.warehouse!==undefined?dataRow[mh.warehouse]:'')||'';
+      mainInfo.shippedBy=(mh.shippedBy!==undefined?dataRow[mh.shippedBy]:'')||'';
+      mainInfo.shippingMethod=(mh.shippingMethod!==undefined?dataRow[mh.shippingMethod]:'')||'';
+      mainInfo.shopNames=(mh.shopNames!==undefined?dataRow[mh.shopNames]:'')||'';
+      mainInfo.status=(mh.status!==undefined?dataRow[mh.status]:'')||'';
+    }
+  }
+  var groups=new Map(), rowsTotal=0, totalApproved=0, sitesCount={}, dupExternal={}, zeroQty=[];
+  if(detail){
+    var dh=headMap(detail.rows[0]||[], FBS_DET_KEYS), r2, row, obj, req, g;
+    for(r2=1;r2<detail.rows.length;r2++){
+      row=detail.rows[r2];
+      if(!row || !row.some(function(c){return String(c||'').trim()!=='';})) continue;
+      var external=dh.external!==undefined?String(row[dh.external]||'').trim():'';
+      var reqId=dh.requestId!==undefined?String(row[dh.requestId]||'').trim():'';
+      if(!external && !reqId) continue;
+      req=reqId||mainInfo.requestId||'';
+      var qtyRaw=dh.approvedQty!==undefined?String(row[dh.approvedQty]||'').trim():'';
+      var qty=parseInt(qtyRaw,10); if(isNaN(qty)) qty=0;
+      obj={
+        seq:0, sheetRow:r2+1, requestId:req,
+        shopSku:dh.shopSku!==undefined?String(row[dh.shopSku]||''):'',
+        warehouseSku:dh.warehouseSku!==undefined?String(row[dh.warehouseSku]||''):'',
+        external:external,
+        name:dh.name!==undefined?String(row[dh.name]||''):'',
+        variation:dh.variation!==undefined?String(row[dh.variation]||''):'',
+        barcode:dh.barcode!==undefined?String(row[dh.barcode]||''):'',
+        approvedQty:qtyRaw||'0',
+        status:dh.status!==undefined?String(row[dh.status]||''):'',
+        sites:[]
+      };
+      obj.sites=parseSites(obj.shopSku);
+      obj.sites.forEach(function(s){ sitesCount[s]=(sitesCount[s]||0)+1; });
+      if(external) dupExternal[external]=(dupExternal[external]||0)+1;
+      if(qty<=0) zeroQty.push(obj);
+      totalApproved+=qty;
+      rowsTotal++;
+      if(!groups.has(req)) groups.set(req,[]);
+      groups.get(req).push(obj);
+    }
+    groups.forEach(function(arr){ arr.forEach(function(o,idx){ o.seq=idx+1; }); });
+  }
+  var duplicates=Object.keys(dupExternal).filter(function(k){return dupExternal[k]>1;}).map(function(k){return k+' ×'+dupExternal[k];});
+  return {type:'fbs', mainInfo:mainInfo, groups:groups, rowsTotal:rowsTotal, totalApproved:totalApproved, sitesCount:sitesCount, duplicates:duplicates, zeroQtyCount:zeroQty.length};
+}
+
+function parseCommonFile(sheets){
+  var i, head, target=null;
+  for(i=0;i<sheets.length;i++){
+    head=(sheets[i].rows[0]||[]).map(norm);
+    if(head.indexOf('平台')>=0 && head.indexOf('货件编号')>=0){ target=sheets[i]; break; }
+  }
+  if(!target) return null;
+  var ch=headMap(target.rows[0]||[], COMMON_KEYS), groups=new Map(), rowsTotal=0, totalQty=0;
+  for(var r=1;r<target.rows.length;r++){
+    var row=target.rows[r];
+    if(!row || !row.some(function(c){return String(c||'').trim()!=='';})) continue;
+    var plat=ch.plat!==undefined?String(row[ch.plat]||'').trim():'';
+    var oid=ch.platOrderId!==undefined?String(row[ch.platOrderId]||'').trim():'';
+    if(!plat && !oid) continue;
+    var qtyRaw=ch.planQty!==undefined?String(row[ch.planQty]||'').trim():'0';
+    var qty=parseInt(qtyRaw,10); if(isNaN(qty)) qty=0;
+    var obj={
+      seq:0, sheetRow:r+1, requestId:oid, plat:plat,
+      storeAcct:ch.storeAcct!==undefined?String(row[ch.storeAcct]||''):'',
+      sellerSku:ch.sellerSku!==undefined?String(row[ch.sellerSku]||''):'',
+      external:ch.prodSku!==undefined?String(row[ch.prodSku]||''):'',
+      name:ch.title!==undefined?String(row[ch.title]||''):'',
+      variation:ch.spec!==undefined?String(row[ch.spec]||''):'',
+      salesHeadChannel:ch.salesHeadChannel!==undefined?String(row[ch.salesHeadChannel]||''):'',
+      approvedQty:qtyRaw||'0', sites:[]
+    };
+    rowsTotal++; totalQty+=qty;
+    if(!groups.has(oid)) groups.set(oid,[]);
+    groups.get(oid).push(obj);
+  }
+  groups.forEach(function(arr){ arr.forEach(function(o,idx){ o.seq=idx+1; }); });
+  return {type:'common', mainInfo:{}, groups:groups, rowsTotal:rowsTotal, totalApproved:totalQty, sitesCount:{}, duplicates:[], zeroQtyCount:0};
+}
+
+/* ---------- 报错文本解析 ---------- */
+var SHIPMENT_ID_RE=/(?:shopee[-‐–])?([A-Za-z0-9][A-Za-z0-9_]*)[-‐–](\d{1,3})[-‐–]([A-Za-z0-9_.]+)/g;
+var ERROR_HINT=/(失败|错误|不存在|为空|需相同|禁运|停售|混发|未匹配|未配置|未找到|未映射|请操作确认|请检查|超过)/;
+function parseErrorText(text){
+  var out=[], lines=String(text||'').split(/\r?\n/), li, line, matches, i, m, end, nextStart, reason;
+  for(li=0;li<lines.length;li++){
+    line=lines[li].trim();
+    if(!line) continue;
+    matches=[];
+    SHIPMENT_ID_RE.lastIndex=0;
+    while((m=SHIPMENT_ID_RE.exec(line))!==null) matches.push(m);
+    if(matches.length){
+      for(i=0;i<matches.length;i++){
+        m=matches[i];
+        end=m.index+m[0].length;
+        nextStart=(i+1<matches.length)?matches[i+1].index:line.length;
+        reason=line.slice(end,nextStart).replace(/^[\s,，:：;；|\t]+/,'').replace(/["'，,;；\s]+$/,'').trim();
+        out.push({reqid:m[1], seq:parseInt(m[2],10), store:m[3], reason:reason||'（未附原因）', ok:/导入成功/.test(reason)});
+      }
+    } else if(ERROR_HINT.test(line) && line.length>3){
+      out.push({reqid:null, seq:null, store:null, reason:line, ok:/导入成功/.test(line)});
+    }
+  }
+  var seen=new Set();
+  return out.filter(function(e){
+    var k=(e.reqid||'')+'#'+(e.seq||'')+'#'+(e.store||'');
+    if(seen.has(k)) return false;
+    seen.add(k); return true;
+  });
+}
+
+/* ---------- 报错知识库 ---------- */
+var KB=[
+  { key:'未匹配到唯一头程', title:'匹配销售头程失败：发货仓库未匹配到唯一头程',
+    explain:function(ctx){
+      if(ctx.shippedBySelf){
+        return '本文件 Shipped By = Self Shipment（自发/DropOff）。系统匹配头程的顺序是：① 马来头程按发货仓库「义乌仓」过滤 → ② 按 SKU 的物流属性过滤（渠道属性必须覆盖 SKU 属性）→ ③ 按货代名称关键字过滤。该报错绝大多数是【第③步后匹配结果为 0 条】：SKU 带特货物流属性（如 手表和≤2纽电池、膏状、带电、带磁等），货代渠道（如 马来-吉远海运普货义乌）未维护这些特货属性而在第②步被剔除，剩下的虾皮官方渠道名称又不含该货代关键字而在第③步全部落选。报错里的“候选头程”是货代过滤前的展示，并不代表“二选一无法决定”。';
+      }
+      return '系统按义乌仓 + 类目物流属性（普货/特货）+ 货代/渠道关键字过滤后，可用头程不是恰好 1 条。通常是渠道的物流属性配置重叠或缺失，或平台仓仓库配置的货代与渠道不匹配。';
+    },
+    advice:function(ctx){
+      if(ctx.shippedBySelf){
+        return [
+          '把下方失败明细发给仓配/头程配置维护人：在【海外仓头程 → 物流方式】中，给货代的马来海运渠道补充缺失的特货「物流属性」（对照失败 SKU 的属性，如 手表和≤2纽电池、膏状等），并确认勾选「义乌仓」发货仓库。',
+          '配置修复后，只需从 SKU Detail 表筛出失败行另存为新文件单独重导（避免整份重导与已成功货件重复）。',
+          '若渠道配置确认无误仍报错，请联系开发，提供货件号与导入时间排查 trade-lms 日志。'
+        ];
+      }
+      return [
+        '联系仓配检查马来官方特货/普货两条渠道的「物流属性」与「发货仓库（义乌仓）」配置是否重叠或缺失。',
+        '若配置无误，请联系开发提供货件号与导入时间排查日志。'
+      ];
+    } },
+  { key:'未配置头程', title:'发货仓库[…]未配置头程',
+    explain:'匹配头程时，该发货仓库（如义乌仓）下没有任何可用的物流方式：海外仓头程页面的物流方式没有勾选这个发货仓库，或渠道未启用。',
+    advice:['联系仓配在【海外仓头程 → 物流方式】为对应渠道勾选该发货仓库（义乌仓）并启用。'] },
+  { key:'未找到Shopee平台默认发货仓库', title:'未找到Shopee平台默认发货仓库',
+    explain:'Shopee 货件导入固定按平台默认发货仓库（义乌仓）过滤头程，系统里义乌仓被停用或缺失时无法匹配。',
+    advice:['联系管理员恢复/启用基础资料中的义乌仓（prod_warehouse），或找开发确认仓库配置。'] },
+  { key:'特货普货混发', title:'该货件存在特货普货混发',
+    explain:'虾皮官方货件按 shopee 类目物流属性区分普货/特货，同一货件内两种都有时需要人工确认。',
+    advice:['在导入确认弹窗中点击确认继续；或将普货、特货 SKU 拆成两个文件分别导入。'] },
+  { key:'头程渠道需相同', title:'同批次货件计划的头程渠道需相同',
+    explain:'通用模板导入时，同一货件编号下的行必须填写同一个销售头程渠道，出现多个时整批不创建。',
+    advice:['按头程渠道拆分文件，或统一修改为同一渠道后重导。'] },
+  { key:'平台仓禁运', title:'类目设置为平台仓禁运',
+    explain:'SKU 对应的 shopee 类目被标记为平台仓禁运，不能通过 FBS 入仓。',
+    advice:['确认类目配置是否误标；确属禁运的 SKU 需走其他渠道，不能走平台仓。'] },
+  { key:'平台仓类目设置为空', title:'平台仓类目设置为空',
+    explain:'SKU 对应的 shopee 类目缺少平台仓类目类型（普货/特货）数据，无法匹配头程。',
+    advice:['联系类目/数据维护补齐 shopee 类目的平台仓类目类型后重导。'] },
+  { key:'缺少平台仓类目扩展数据', title:'缺少平台仓类目扩展数据',
+    explain:'SKU 对应的 shopee 类目扩展信息缺失，无法判断普货/特货。',
+    advice:['联系开发/数据维护补齐类目扩展数据后重导。'] },
+  { key:'未映射到oa商品', title:'External SKU ID 未映射到 OA 商品',
+    explain:'明细行的 External SKU ID 在系统中没有映射到 OA 商品（商品资料缺失或编码不一致）。',
+    advice:['先在系统中补齐 SKU 映射/商品资料，再重导该行。'] },
+  { key:'停售', title:'存在 sbs 停售的 SKU',
+    explain:'货件中存在已停售的 SBS 商品，不允许导入。',
+    advice:['恢复商品在售状态，或从文件中去掉该行后重导。'] },
+  { key:'收货地址', title:'收货地址相关问题',
+    explain:'收货地址简称在系统中不存在，或同批次收货地址不一致。',
+    advice:['检查文件中的入库仓库/地址简称是否与系统【平台仓收货地址】一致。'] },
+  { key:'入库单号不能超过255', title:'入库单号超长',
+    explain:'入库单号超过 255 字符。',
+    advice:['检查入库单号字段内容。'] },
+  { key:'sbs', title:'SBS 商品数据问题',
+    explain:'SBS 商品信息校验未通过（不存在/停售/资料不全）。',
+    advice:['先在虾皮商品库补齐 SBS 数据后重导。'] }
+];
+function kbMatch(reason){
+  var i;
+  for(i=0;i<KB.length;i++){ if(reason.indexOf(KB[i].key)>=0) return KB[i]; }
+  return null;
+}
+
+/* ---------- 分析 ---------- */
+function analyzeFileAndErrors(parsed, errors, fileMeta){
+  var ctx={ shippedBySelf:/self\s*shipment/i.test(parsed.mainInfo.shippedBy||'') };
+  var byKey=new Map();
+  parsed.groups.forEach(function(arr, req){
+    arr.forEach(function(o){ byKey.set(String(req).toLowerCase()+'#'+o.seq, o); });
+  });
+  var failGroups=[], unmatched=[], unparsed=[], okRows=[], failedKeys=new Set(), i, e, row, kb, g;
+  var entries=errors||[];
+  for(i=0;i<entries.length;i++){
+    e=entries[i];
+    if(e.ok){ okRows.push(e); continue; }
+    if(!e.reqid){ unparsed.push(e); continue; }
+    row=byKey.get((e.reqid||'').toLowerCase()+'#'+e.seq);
+    kb=kbMatch(e.reason);
+    if(!row){ unmatched.push(e); continue; }
+    failedKeys.add((e.reqid||'').toLowerCase()+'#'+e.seq);
+    var found=null, j;
+    for(j=0;j<failGroups.length;j++){ if(failGroups[j].kbKey===(kb?kb.key:'__other')&&failGroups[j].reason===e.reason){ found=failGroups[j]; break; } }
+    if(!found){
+      found={kbKey:kb?kb.key:'__other', reason:e.reason, count:0, rows:[]};
+      failGroups.push(found);
+    }
+    found.count++;
+    found.rows.push({shipment:(parsed.type==='fbs'?'shopee-':'')+e.reqid+'-'+(e.seq<100?('00'+e.seq).slice(-3):e.seq)+'-'+e.store,
+      seq:e.seq, sheetRow:row.sheetRow, requestId:e.reqid, store:e.store,
+      external:row.external, name:row.name, variation:row.variation, qty:row.approvedQty,
+      barcode:row.barcode, shopSku:row.shopSku, sites:row.sites, reason:e.reason});
+  }
+  failGroups.sort(function(a,b){return b.count-a.count;});
+  var failedCount=failGroups.reduce(function(s,x){return s+x.count;},0);
+  var successCount=(parsed.rowsTotal>0 && (failedCount+unmatched.length)>0)?(parsed.rowsTotal-failedCount-unmatched.length):null;
+  return {ctx:ctx, failGroups:failGroups, unmatched:unmatched, unparsed:unparsed, okRowCount:okRows.length,
+    failedCount:failedCount, successCount:successCount, parsed:parsed, fileMeta:fileMeta||{}};
+}
+
+/* ---------- 报告生成 ---------- */
+function pad3(n){ return (n<100?('00'+n).slice(-3):''+n); }
+function buildReport(an){
+  var p=an.parsed, L=[];
+  var now=new Date(), ts=now.getFullYear()+'-'+String(now.getMonth()+1).padStart(2,'0')+'-'+String(now.getDate()).padStart(2,'0')+' '+String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  L.push('【FBS 货件导入报错分析】生成时间：'+ts);
+  L.push('');
+  if(p.type==='fbs'){
+    L.push('■ 文件概览');
+    L.push('- 文件：'+(an.fileMeta.name||'-')+'（'+(an.fileMeta.size?('大小 '+(an.fileMeta.size/1024).toFixed(0)+' KB'):'')+'）');
+    L.push('- Request ID：'+(p.mainInfo.requestId||'-')+' ｜ 入库单号：'+(p.mainInfo.inboundId||'-'));
+    L.push('- 入仓仓库：'+(p.mainInfo.warehouse||'-')+' ｜ Shipped By：'+(p.mainInfo.shippedBy||'-')+' ｜ Shipping Method：'+(p.mainInfo.shippingMethod||'-'));
+    L.push('- SKU 行数：'+p.rowsTotal+' ｜ 批准总量：'+p.totalApproved+(Object.keys(p.sitesCount).length?(' ｜ 站点分布：'+Object.keys(p.sitesCount).map(function(k){return k+'×'+p.sitesCount[k];}).join('、')):''));
+  } else if(p.type==='common'){
+    L.push('■ 文件概览（通用模板）');
+    L.push('- 文件：'+(an.fileMeta.name||'-'));
+    L.push('- 数据行数：'+p.rowsTotal+' ｜ 计划总量：'+p.totalApproved);
+  } else {
+    L.push('■ 未上传文件，以下基于粘贴的报错内容分析');
+  }
+  L.push('');
+  if(an.failedCount===0 && an.unparsed.length===0 && an.unmatched.length===0){
+    L.push('■ 本次未解析到失败记录'+(an.okRowCount?('（粘贴内容里成功 '+an.okRowCount+' 条）'):''));
+    L.push('');
+    L.push('说明：若导入确有报错，请把导入结果中的失败行粘贴到工具文本框后重新分析。');
+    return L.join('\n');
+  }
+  L.push('■ 报错总览：失败 '+an.failedCount+' 条'+(an.successCount!==null?('，文件中其余约 '+an.successCount+' 条未报错'):'')+(an.okRowCount?('，粘贴中成功 '+an.okRowCount+' 条'):''));
+  L.push('');
+  an.failGroups.forEach(function(g,idx){
+    var kb=kbMatch(g.reason);
+    L.push('――――――――――――――――――――');
+    L.push((idx+1)+'. 【'+g.reason+'】 ×'+g.count+' 条');
+    if(kb){
+      L.push('');
+      L.push('原因：'+kb.explain(an.ctx));
+      L.push('');
+      L.push('建议：');
+      var adv=kb.advice(an.ctx);
+      for(var i=0;i<adv.length;i++) L.push('  '+(i+1)+'. '+adv[i]);
+    } else {
+      L.push('');
+      L.push('原因：未识别的报错类型，请将货件号+导入时间发给开发排查 trade-lms 日志。');
+    }
+    L.push('');
+    L.push('失败明细：');
+    L.push('货件号 | sheet行号 | SKU | 名称 | 数量 | 店铺');
+    g.rows.forEach(function(r){
+      L.push(r.shipment+' | '+(p.type==='fbs'?'SKU Detail ':'')+'第'+r.sheetRow+'行 | '+r.external+' | '+String(r.name).slice(0,30)+' | '+r.qty+' | '+r.store);
+    });
+    L.push('');
+  });
+  if(an.unmatched.length){
+    L.push('――――――――――――――――――――');
+    L.push('※ 以下 '+(an.unmatched.length)+' 条报错未能对应到文件中的行（货件号与文件不符，或文件非本次导入的文件）：');
+    an.unmatched.forEach(function(e){ L.push('- '+(e.reqId||e.reqid)+'-'+e.seq+'-'+(e.store||'')+'：'+e.reason); });
+    L.push('');
+  }
+  if(an.unparsed.length){
+    L.push('※ 另有 '+(an.unparsed.length)+' 行无法解析出货件号（已忽略或需人工确认）：');
+    an.unparsed.slice(0,10).forEach(function(e){ L.push('- '+String(e.reason).slice(0,80)); });
+    L.push('');
+  }
+  if(p.type==='fbs'){
+    L.push('――――――――――――――――――――');
+    L.push('重导提示：修复配置后，从 SKU Detail 表筛出失败行（行号见上）另存新文件单独导入；已成功货件不要整份重导，避免重复创建。');
+  }
+  return L.join('\n');
+}
+
+if(typeof module!=='undefined'&&module.exports){
+  module.exports={inflateRaw:inflateRaw,unzip:unzip,readWorkbook:readWorkbook,parseFbsFile:parseFbsFile,parseCommonFile:parseCommonFile,parseErrorText:parseErrorText,analyzeFileAndErrors:analyzeFileAndErrors,buildReport:buildReport,xmlDecode:xmlDecode};
+}
+/* ===== CORE-END ===== */
+
+/* ---------- UI ---------- */
+(function(){
+  var $=function(id){return document.getElementById(id);};
+  var state={parsed:null, fileMeta:null};
+  var drop=$('drop'), fileInput=$('file'), paste=$('paste'), msg=$('msg');
+
+  function showMsg(text, kind){ msg.textContent=text; msg.className='msg '+(kind||'err'); }
+  function clearMsg(){ msg.className='msg'; msg.textContent=''; }
+  function toast(t){ var el=$('toast'); el.textContent=t; el.classList.add('show'); setTimeout(function(){el.classList.remove('show');},1800); }
+
+  drop.addEventListener('click',function(){ fileInput.click(); });
+  ['dragenter','dragover'].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.add('on'); }); });
+  ['dragleave','drop'].forEach(function(ev){ drop.addEventListener(ev,function(e){ e.preventDefault(); drop.classList.remove('on'); }); });
+  drop.addEventListener('drop',function(e){ if(e.dataTransfer.files.length) handleFile(e.dataTransfer.files[0]); });
+  fileInput.addEventListener('change',function(){ if(fileInput.files.length) handleFile(fileInput.files[0]); });
+
+  function handleFile(file){
+    clearMsg();
+    var name=file.name||'';
+    if(!/\.xlsx$/i.test(name)){ showMsg('请上传 .xlsx 文件（Shopee 后台下载的 FBS 文件即 .xlsx）','err'); return; }
+    var reader=new FileReader();
+    reader.onload=function(){
+      try{
+        var sheets=readWorkbook(reader.result);
+        var parsed=parseFbsFile(sheets);
+        if(!parsed) parsed=parseCommonFile(sheets);
+        if(!parsed){ showMsg('未识别出 FBS 官方模板或通用导入模板的表头，请确认上传的是导入用的货件文件','err'); state.parsed=null; $('filetag').innerHTML=''; return; }
+        state.parsed=parsed; state.fileMeta={name:name,size:file.size};
+        $('filetag').innerHTML='<span class="filetag">✓ '+esc(name)+' — '+
+          (parsed.type==='fbs'?('FBS 官方模板，SKU '+parsed.rowsTotal+' 行'):('通用模板，数据 '+parsed.rowsTotal+' 行'))+'</span>';
+        autoRun();
+      }catch(ex){ showMsg('解析失败：'+ex.message,'err'); state.parsed=null; }
+    };
+    reader.onerror=function(){ showMsg('文件读取失败，请重试','err'); };
+    reader.readAsArrayBuffer(file);
+  }
+
+  paste.addEventListener('input',function(){ countPaste(); });
+
+  function countPaste(){
+    var entries=parseErrorText(paste.value);
+    var fails=entries.filter(function(e){return !e.ok;}).length;
+    var oks=entries.filter(function(e){return e.ok;}).length;
+    $('pasteCount').textContent=entries.length?('已识别 '+(fails+oks)+' 行：失败 '+fails+'、成功 '+oks):'';
+  }
+
+  $('run').addEventListener('click',autoRun);
+  $('clear').addEventListener('click',function(){
+    state={parsed:null,fileMeta:null}; paste.value=''; fileInput.value='';
+    $('filetag').innerHTML=''; $('pasteCount').textContent='';
+    $('result').classList.add('hidden'); clearMsg();
+  });
+
+  function autoRun(){
+    clearMsg();
+    var entries=parseErrorText(paste.value);
+    if(!state.parsed && entries.length===0){ showMsg('请先上传文件，或粘贴报错内容','err'); return; }
+    if(!state.parsed && entries.length>0){ showMsg('未上传文件：仅能统计报错分类，无法关联 SKU 明细。建议同时上传对应文件。','ok'); }
+    var an=analyzeFileAndErrors(state.parsed||{type:'none',mainInfo:{},groups:new Map(),rowsTotal:0,totalApproved:0,sitesCount:{},duplicates:[],zeroQtyCount:0}, entries, state.fileMeta);
+    render(an);
+    if(state.parsed && entries.length===0 && an.failedCount===0){
+      showMsg('文件已解析。粘贴导入结果中的报错后点击“开始分析”，可获得逐条失败明细与处理建议。','ok');
+    }
+  }
+
+  function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  function render(an){
+    var p=an.parsed;
+    $('result').classList.remove('hidden');
+    /* 概览 */
+    var kv=[];
+    if(p.type==='fbs'){
+      kv=[['Request ID',p.mainInfo.requestId],['入库单号',p.mainInfo.inboundId],['入仓仓库',p.mainInfo.warehouse],
+        ['Shipped By',p.mainInfo.shippedBy],['Shipping Method',p.mainInfo.shippingMethod],['申请状态',p.mainInfo.status],
+        ['SKU 行数',p.rowsTotal],['批准总量',p.totalApproved],
+        ['站点分布',Object.keys(p.sitesCount).map(function(k){return k+'×'+p.sitesCount[k];}).join('、')||'-'],
+        ['重复 SKU',p.duplicates.length?p.duplicates.join('、'):'无']];
+    } else if(p.type==='common'){
+      kv=[['模板类型','通用导入模板'],['数据行数',p.rowsTotal],['计划总量',p.totalApproved]];
+    } else { kv=[['文件','（未上传）']]; }
+    $('overview').innerHTML=kv.map(function(x){ return '<div><b>'+esc(x[0])+'</b>'+esc(x[1]||'-')+'</div>'; }).join('');
+    /* 统计 */
+    var st=[];
+    st.push('<div class="stat"><div class="k">失败条数</div><div class="v red">'+an.failedCount+'</div></div>');
+    st.push('<div class="stat"><div class="k">错误类型</div><div class="v amber">'+an.failGroups.length+'</div></div>');
+    if(an.successCount!==null) st.push('<div class="stat"><div class="k">文件中未报错</div><div class="v green">'+an.successCount+'</div></div>');
+    if(an.okRowCount) st.push('<div class="stat"><div class="k">粘贴中成功</div><div class="v green">'+an.okRowCount+'</div></div>');
+    st.push('<div class="stat"><div class="k">未匹配到文件行</div><div class="v '+(an.unmatched.length?'amber':'')+'">'+an.unmatched.length+'</div></div>');
+    $('stats').innerHTML=st.join('');
+    $('grpStats').innerHTML=an.failGroups.map(function(g){
+      return '<div class="grp"><div class="gt"><span class="badge red">×'+g.count+'</span>'+esc(g.reason).slice(0,120)+'</div></div>';
+    }).join('')||'<div class="hint">无失败记录</div>';
+    /* 知识库 */
+    $('kb').innerHTML=an.failGroups.length?an.failGroups.map(function(g){
+      var kb=kbMatch(g.reason);
+      var inner;
+      if(kb){
+        inner='<div class="explain">'+esc(kb.explain(an.ctx))+'</div><ul class="advice">'+
+          kb.advice(an.ctx).map(function(a){return '<li>'+esc(a)+'</li>';}).join('')+'</ul>';
+      } else {
+        inner='<div class="explain">未识别的报错类型：请将货件号与导入时间发给开发，排查 trade-lms 日志。</div>';
+      }
+      return '<div class="grp"><div class="gt"><span class="badge blue">×'+g.count+'</span>'+esc(g.reason)+'</div>'+inner+'</div>';
+    }).join(''):'<div class="hint">无失败记录。若导入确有报错，请粘贴导入结果中的失败行。</div>';
+    /* 明细表 */
+    var cols=['#','货件号',(p.type==='fbs'?'SKU Detail 行号':'行号'),'External SKU / 商品SKU','商品名称','规格','数量','店铺','错误'];
+    var thead='<tr>'+cols.map(function(c){return '<th>'+c+'</th>';}).join('')+'</tr>';
+    var rows=[];
+    an.failGroups.forEach(function(g){ g.rows.forEach(function(r){ rows.push(r); }); });
+    rows.sort(function(a,b){return a.seq-b.seq;});
+    window.__rows=rows;
+    $('detailTbl').querySelector('thead').innerHTML=thead;
+    renderRows(rows);
+    $('filter').value='';
+    $('filter').oninput=function(){
+      var q=this.value.trim().toLowerCase();
+      renderRows(!q?rows:rows.filter(function(r){
+        return (r.shipment+' '+r.external+' '+r.name+' '+r.variation+' '+r.store+' '+r.reason).toLowerCase().indexOf(q)>=0;
+      }));
+    };
+    /* 报告 */
+    $('report').textContent=buildReport(an);
+  }
+
+  function renderRows(rows){
+    var tb=$('detailTbl').querySelector('tbody');
+    tb.innerHTML=rows.map(function(r,i){
+      return '<tr><td>'+(i+1)+'</td><td class="wrap">'+esc(r.shipment)+'</td><td>'+r.sheetRow+'</td><td class="wrap">'+esc(r.external)+'</td>'+
+        '<td class="wrap">'+esc(String(r.name).slice(0,60))+'</td><td class="wrap">'+esc(r.variation)+'</td><td>'+esc(r.qty)+'</td>'+
+        '<td class="wrap">'+esc(r.store)+'</td><td class="wrap">'+esc(r.reason)+'</td></tr>';
+    }).join('')||'<tr><td colspan="9" style="text-align:center;color:#9ca3af;padding:18px">无数据</td></tr>';
+  }
+
+  $('copy').addEventListener('click',function(){
+    var text=$('report').textContent;
+    function fallback(){
+      var ta=document.createElement('textarea'); ta.value=text; document.body.appendChild(ta);
+      ta.select(); try{ document.execCommand('copy'); toast('已复制，可粘贴到钉钉/微信'); }catch(e){ toast('复制失败，请手动选择文本'); }
+      document.body.removeChild(ta);
+    }
+    if(navigator.clipboard&&navigator.clipboard.writeText){
+      navigator.clipboard.writeText(text).then(function(){ toast('已复制，可粘贴到钉钉/微信'); },fallback);
+    } else fallback();
+  });
+  $('download').addEventListener('click',function(){
+    var blob=new Blob([$('report').textContent],{type:'text/markdown;charset=utf-8'});
+    var a=document.createElement('a');
+    a.href=URL.createObjectURL(blob);
+    a.download='FBS导入报错分析_'+new Date().toISOString().slice(0,10)+'.md';
+    document.body.appendChild(a); a.click();
+    setTimeout(function(){ URL.revokeObjectURL(a.href); document.body.removeChild(a); },100);
+  });
+})();
+</script>
+</body>
+</html>
